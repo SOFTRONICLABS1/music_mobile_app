@@ -1,7 +1,7 @@
 import React from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { GameOwnerProfile } from '../../components/profile/GameOwnerProfile';
+import GameOwnerProfile from '../../components/profile/GameOwnerProfile';
 import { CommonStyles } from '../../utils/styles';
 
 const mockPlaylists = [
@@ -77,9 +77,11 @@ export default function UserProfileScreen() {
   return (
     <SafeAreaView style={[CommonStyles.container, styles.container]}>
       <GameOwnerProfile 
-        user={user}
-        playlists={mockPlaylists}
-        onFollowToggle={handleFollowToggle}
+        ownerName={user.name}
+        gamesCreated={mockPlaylists.length}
+        totalPlays={mockPlaylists.reduce((total, playlist) => total + playlist.tracks.length * 1000, 0)}
+        rating={4.8}
+        onContactOwner={handleFollowToggle}
       />
     </SafeAreaView>
   );
