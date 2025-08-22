@@ -5,6 +5,8 @@ import {
   SafeAreaView,
   Pressable,
   Image,
+  ScrollView,
+  Modal,
 } from 'react-native';
 import React, {useEffect, useState, useContext} from 'react';
 import {GoogleSignin} from '@react-native-google-signin/google-signin';
@@ -14,19 +16,26 @@ import {AuthContext} from '../AuthContext';
 
 GoogleSignin.configure({
   webClientId:
-    'yourID',
+    '215325519739-mqhrsub07bllp648iistum7qap3v2t5l.apps.googleusercontent.com',
   iosClientId:
-    'yourID',
+    '215325519739-mqhrsub07bllp648iistum7qap3v2t5l.apps.googleusercontent.com',
   scopes: ['profile', 'email'],
 });
 
 const LoginScreen = () => {
   const {token, setToken} = useContext(AuthContext);
+  const [googleResponse, setGoogleResponse] = useState(null);
+  const [showInspector, setShowInspector] = useState(false);
 
   const GoogleLogin = async () => {
     await GoogleSignin.hasPlayServices();
     const userInfo = await GoogleSignin.signIn();
-    console.log('u', userInfo);
+    console.log('=== GOOGLE SIGN-IN RESPONSE ===');
+    console.log('Full userInfo object:', JSON.stringify(userInfo, null, 2));
+    console.log('ID Token:', userInfo.idToken);
+    console.log('User data:', userInfo.user);
+    console.log('Server auth code:', userInfo.serverAuthCode);
+    console.log('================================');
     return userInfo;
   };
 
@@ -36,6 +45,8 @@ const LoginScreen = () => {
     setLoading(true);
     try {
       const response = await GoogleLogin(); // Google sign-in
+      setGoogleResponse(response); // Store the response to display in UI
+      
       const {idToken} = response; // Check if idToken is directly available
 
       console.log('idToken:', idToken); // Log idToken to check if it's retrieved
@@ -47,7 +58,7 @@ const LoginScreen = () => {
       if (extractedIdToken) {
         // Send idToken to the backend using axios
         const backendResponse = await axios.post(
-          'http://localhost:8000/google-login',
+          'http://localhost:4000/google-login',
           {
             idToken: extractedIdToken, // Sending the idToken
           },
@@ -106,6 +117,59 @@ const LoginScreen = () => {
             Already have an account? Sign In
           </Text>
         </Pressable>
+
+        {/* Display Google Sign-In Response */}
+        {googleResponse && (
+          <View style={{margin: 20, padding: 15, backgroundColor: '#f0f0f0', borderRadius: 10}}>
+            <Text style={{fontSize: 16, fontWeight: 'bold', marginBottom: 10}}>
+              Google Sign-In Response:
+            </Text>
+            <Text style={{fontSize: 12, fontFamily: 'monospace'}}>
+              ID Token: {googleResponse.idToken ? googleResponse.idToken.substring(0, 50) + '...' : 'Not available'}
+            </Text>
+            <Text style={{fontSize: 12, marginTop: 5}}>
+              User: {googleResponse.user?.name} ({googleResponse.user?.email})
+            </Text>
+            <Text style={{fontSize: 12, marginTop: 5}}>
+              Server Auth Code: {googleResponse.serverAuthCode || 'Not available'}
+            </Text>
+            <View style={{flexDirection: 'row', marginTop: 10, gap: 10}}>
+              <Pressable 
+                onPress={() => setShowInspector(true)} 
+                style={{flex: 1, padding: 8, backgroundColor: '#007AFF', borderRadius: 5}}>
+                <Text style={{textAlign: 'center', color: 'white', fontWeight: 'bold'}}>Inspect Raw Response</Text>
+              </Pressable>
+              <Pressable 
+                onPress={() => setGoogleResponse(null)} 
+                style={{flex: 1, padding: 8, backgroundColor: '#ddd', borderRadius: 5}}>
+                <Text style={{textAlign: 'center'}}>Hide Response</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {/* Full Response Inspector Modal */}
+        <Modal visible={showInspector} animationType="slide" presentationStyle="pageSheet">
+          <SafeAreaView style={{flex: 1, backgroundColor: '#000'}}>
+            <View style={{padding: 20, backgroundColor: '#333'}}>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+                <Text style={{color: 'white', fontSize: 18, fontWeight: 'bold'}}>
+                  Raw Google Response Inspector
+                </Text>
+                <Pressable 
+                  onPress={() => setShowInspector(false)}
+                  style={{padding: 10, backgroundColor: '#666', borderRadius: 5}}>
+                  <Text style={{color: 'white'}}>Close</Text>
+                </Pressable>
+              </View>
+            </View>
+            <ScrollView style={{flex: 1, backgroundColor: '#111', padding: 15}}>
+              <Text style={{color: '#0FF', fontSize: 14, fontFamily: 'monospace', lineHeight: 20}}>
+                {googleResponse ? JSON.stringify(googleResponse, null, 2) : 'No response data'}
+              </Text>
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
       </View>
     </SafeAreaView>
   );

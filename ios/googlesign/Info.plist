@@ -9,19 +9,16 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-			<string>com.googleusercontent.apps.YOUR_WEB_CLIENT_ID</string>
-			<string>com.googleusercontent.apps.yourID</string>
+			<string>com.googleusercontent.apps.215325519739-mqhrsub07bllp648iistum7qap3v2t5l</string>
 		</array>
     </dict>
     </array>
     <key>GIDClientID</key>
-    <string>yourID.apps.googleusercontent.com</string>
-    <key>GIDRedirectURI</key>
-    <string>com.googleusercontent.yourID:/oauth2redirect/google</string>
+    <string>215325519739-mqhrsub07bllp648iistum7qap3v2t5l.apps.googleusercontent.com</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>googlesign</string>
+	<string>MusicApp</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
