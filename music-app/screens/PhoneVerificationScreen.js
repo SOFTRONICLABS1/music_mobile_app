@@ -32,8 +32,8 @@ export default function PhoneVerificationScreen({ navigation }) {
   const [showCountryPicker, setShowCountryPicker] = useState(false);
 
   const handlePhoneSubmit = () => {
-    if (phoneNumber.length < 10) {
-      Alert.alert('Invalid Phone', 'Please enter a valid phone number');
+    if (phoneNumber.length !== 10) {
+      Alert.alert('Invalid Phone', 'Please enter exactly 10 digits');
       return;
     }
     // Phone number accepted, move to next screen
@@ -92,32 +92,38 @@ export default function PhoneVerificationScreen({ navigation }) {
               </TouchableOpacity>
               <TextInput
                 style={[styles.phoneInput, { color: theme.text }]}
-                placeholder="Phone number"
+                placeholder="Phone number (10 digits)"
                 placeholderTextColor={theme.textSecondary}
                 value={phoneNumber}
-                onChangeText={setPhoneNumber}
-                keyboardType="phone-pad"
-                maxLength={15}
+                onChangeText={(text) => {
+                  // Only allow numeric characters and limit to 10 digits
+                  const numericText = text.replace(/[^0-9]/g, '');
+                  if (numericText.length <= 10) {
+                    setPhoneNumber(numericText);
+                  }
+                }}
+                keyboardType="numeric"
+                maxLength={10}
               />
             </View>
             <TouchableOpacity 
               style={[
                 styles.sendButton,
-                { backgroundColor: phoneNumber.length < 8 ? theme.border : theme.primary }
+                { backgroundColor: phoneNumber.length !== 10 ? theme.border : theme.primary }
               ]} 
               onPress={handlePhoneSubmit}
-              disabled={phoneNumber.length < 8}
+              disabled={phoneNumber.length !== 10}
             >
               <Text style={[
                 styles.sendButtonText,
-                { color: phoneNumber.length < 8 ? theme.textSecondary : 'white' }
+                { color: phoneNumber.length !== 10 ? theme.textSecondary : 'white' }
               ]}>
                 Continue
               </Text>
               <IconSymbol 
                 name="arrow.right" 
                 size={20} 
-                color={phoneNumber.length < 8 ? theme.textSecondary : "white"} 
+                color={phoneNumber.length !== 10 ? theme.textSecondary : "white"} 
               />
             </TouchableOpacity>
           </View>

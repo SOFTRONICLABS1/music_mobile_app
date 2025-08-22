@@ -28,15 +28,23 @@ const LoginScreen = () => {
   const [showInspector, setShowInspector] = useState(false);
 
   const GoogleLogin = async () => {
-    await GoogleSignin.hasPlayServices();
-    const userInfo = await GoogleSignin.signIn();
-    console.log('=== GOOGLE SIGN-IN RESPONSE ===');
-    console.log('Full userInfo object:', JSON.stringify(userInfo, null, 2));
-    console.log('ID Token:', userInfo.idToken);
-    console.log('User data:', userInfo.user);
-    console.log('Server auth code:', userInfo.serverAuthCode);
-    console.log('================================');
-    return userInfo;
+    try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      console.log('=== GOOGLE SIGN-IN RESPONSE ===');
+      console.log('Full userInfo object:', JSON.stringify(userInfo, null, 2));
+      console.log('ID Token:', userInfo.idToken);
+      console.log('User data:', userInfo.user);
+      console.log('Server auth code:', userInfo.serverAuthCode);
+      console.log('================================');
+      return userInfo;
+    } catch (error) {
+      if (error.code === 'SIGN_IN_CANCELLED') {
+        console.log('User cancelled Google sign-in');
+        throw error; // Re-throw to be handled by caller
+      }
+      throw error;
+    }
   };
 
   const [loading, setLoading] = useState(false);
@@ -76,6 +84,11 @@ const LoginScreen = () => {
         // Handle JWT token and user data here
       }
     } catch (error) {
+      if (error.code === 'SIGN_IN_CANCELLED') {
+        console.log('User cancelled Google sign-in - staying on current screen');
+        // Don't show error, just return silently
+        return;
+      }
       console.log('Login Error:', error);
     } finally {
       setLoading(false);

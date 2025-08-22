@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable, StyleSheet, Alert, Platform } from 'react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { IconSymbol } from '../ui/IconSymbol';
 import { useTheme } from '../../theme/ThemeContext';
+import { authService } from '../../src/api';
 
 interface SignInFormProps {
   onGoogleSignInSuccess: (userInfo: any) => void;
@@ -15,6 +16,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onGoogleSignInSuccess })
   const handleGoogleSignIn = async () => {
     try {
       setIsLoading(true);
+      console.log('=== STARTING GOOGLE SIGN-IN ===');
       
       // Check if your device supports Google Play
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
@@ -22,16 +24,76 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onGoogleSignInSuccess })
       // Get the user's ID token
       const userInfo = await GoogleSignin.signIn();
       
-      console.log('Google Sign-In Success:', userInfo);
-      onGoogleSignInSuccess(userInfo);
+      console.log('=== GOOGLE SIGN-IN RESULT ===');
+      console.log('Full userInfo:', JSON.stringify(userInfo, null, 2));
+      console.log('userInfo type:', typeof userInfo);
+      console.log('userInfo exists:', !!userInfo);
+      
+      // Check for successful sign-in
+      if (userInfo && userInfo.type === 'success' && userInfo.data && userInfo.data.user && userInfo.data.user.email) {
+        console.log('✅ SIGN-IN SUCCESSFUL - CALLING SUCCESS CALLBACK');
+        console.log('✅ User email:', userInfo.data.user.email);
+        console.log('✅ ID Token:', userInfo.data.idToken?.substring(0, 50) + '...');
+        
+        // Call backend API to verify Google token
+        try {
+          console.log('📡 Calling backend API to verify Google token...');
+          const apiResponse = await authService.verifyGoogleToken(
+            userInfo.data.idToken || '',
+            {
+              user_info: userInfo.data.user,
+              device_info: {
+                platform: 'mobile',
+                os: Platform.OS,
+              }
+            }
+          );
+          
+          console.log('🎉 Backend verification successful!');
+          console.log('📦 API Response:', JSON.stringify(apiResponse, null, 2));
+          
+          // Pass both Google and API response to success handler
+          onGoogleSignInSuccess({
+            ...userInfo,
+            apiResponse: apiResponse
+          });
+          
+        } catch (apiError: any) {
+          console.error('❌ Backend verification failed:', apiError);
+          Alert.alert(
+            'Verification Failed',
+            apiError.response?.data?.message || 'Failed to verify with server. Please try again.'
+          );
+          return;
+        }
+      } else {
+        console.log('❌ SIGN-IN INCOMPLETE - NOT NAVIGATING');
+        console.log('❌ userInfo.type:', userInfo?.type);
+        console.log('❌ userInfo.data:', !!userInfo?.data);
+        console.log('❌ userInfo.data.user:', !!userInfo?.data?.user);
+        console.log('❌ userInfo.data.user.email:', !!userInfo?.data?.user?.email);
+      }
       
     } catch (error: any) {
-      console.error('Google Sign-In Error:', error);
+      console.log('=== GOOGLE SIGN-IN ERROR ===');
+      console.error('Full error:', error);
+      console.log('Error code:', error.code);
+      console.log('Error message:', error.message);
+      console.log('Error type:', typeof error);
+      
+      // Don't navigate on any error, especially cancellation
+      console.log('❌ ERROR OCCURRED - NOT NAVIGATING');
+      
+      if (error.code === 'SIGN_IN_CANCELLED' || 
+          error.code === '-5' || 
+          error.message?.includes('cancelled') ||
+          error.message?.includes('cancel')) {
+        console.log('❌ CONFIRMED CANCELLATION - STAYING ON PAGE');
+        return;
+      }
       
       let errorMessage = 'Sign in failed. Please try again.';
-      if (error.code === 'SIGN_IN_CANCELLED') {
-        errorMessage = 'Sign in was cancelled.';
-      } else if (error.code === 'IN_PROGRESS') {
+      if (error.code === 'IN_PROGRESS') {
         errorMessage = 'Sign in is already in progress.';
       } else if (error.code === 'PLAY_SERVICES_NOT_AVAILABLE') {
         errorMessage = 'Google Play services not available.';
@@ -40,6 +102,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onGoogleSignInSuccess })
       Alert.alert('Sign In Error', errorMessage);
     } finally {
       setIsLoading(false);
+      console.log('=== GOOGLE SIGN-IN COMPLETED ===');
     }
   };
 

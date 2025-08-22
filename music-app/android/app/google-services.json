@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "60455306259",
+    "project_id": "signin-60f32",
+    "storage_bucket": "signin-60f32.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:60455306259:android:1ff5423dc3b03059a26be6",
+        "android_client_info": {
+          "package_name": "com.musiclearning.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "60455306259-8apbrpu5br59v9n0e8hvr0au5f71991v.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.musiclearning.app",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "60455306259-ml12gn46kbaac5rmnsint4i88e0d7amj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCPAPOy37WNjDYQWfijKZNu8MGp3o5h714"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "60455306259-ml12gn46kbaac5rmnsint4i88e0d7amj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -3,8 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "android": "react-native run-android",
-    "ios": "npx react-native start --reset-cache & sleep 3 && react-native run-ios",
+    "android": "./start-android.sh",
+    "android:simple": "react-native run-android",
+    "ios": "npx react-native start --reset-cache & sleep 5 && npx react-native run-ios",
     "ios:only": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
@@ -40,6 +41,7 @@
     "jest": "^29.6.3",
     "prettier": "2.8.8",
     "react-test-renderer": "18.3.1",
+    "sharp": "^0.34.3",
     "typescript": "5.0.4"
   },
   "engines": {

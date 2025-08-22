@@ -32,6 +32,7 @@ function App() {
       webClientId: '215325519739-mqhrsub07bllp648iistum7qap3v2t5l.apps.googleusercontent.com',
       iosClientId: '215325519739-mqhrsub07bllp648iistum7qap3v2t5l.apps.googleusercontent.com',
       offlineAccess: true,
+      scopes: ['profile', 'email'],
     });
   }, []);
 
