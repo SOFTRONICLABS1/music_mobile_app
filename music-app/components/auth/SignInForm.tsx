@@ -29,49 +29,49 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onGoogleSignInSuccess })
       console.log('userInfo type:', typeof userInfo);
       console.log('userInfo exists:', !!userInfo);
       
-      // Check for successful sign-in
-      if (userInfo && userInfo.type === 'success' && userInfo.data && userInfo.data.user && userInfo.data.user.email) {
+      // Check for successful sign-in (checking all possible response structures)
+      const user = (userInfo as any)?.user || (userInfo as any)?.data?.user;
+      const idToken = (userInfo as any)?.idToken || (userInfo as any)?.data?.idToken;
+      
+      if (userInfo && user && user.email && idToken) {
         console.log('✅ SIGN-IN SUCCESSFUL - CALLING SUCCESS CALLBACK');
-        console.log('✅ User email:', userInfo.data.user.email);
-        console.log('✅ ID Token:', userInfo.data.idToken?.substring(0, 50) + '...');
+        console.log('✅ User email:', user.email);
+        console.log('✅ ID Token:', idToken?.substring(0, 50) + '...');
         
-        // Call backend API to verify Google token
+        // Call backend API for complete Google authentication flow
         try {
-          console.log('📡 Calling backend API to verify Google token...');
-          const apiResponse = await authService.verifyGoogleToken(
-            userInfo.data.idToken || '',
-            {
-              user_info: userInfo.data.user,
-              device_info: {
-                platform: 'mobile',
-                os: Platform.OS,
-              }
-            }
+          console.log('📡 Starting complete Google authentication flow...');
+          const authResult = await authService.googleSignIn(
+            idToken,
+            Platform.OS === 'ios' ? 'ios' : 'android',
+            user
           );
           
-          console.log('🎉 Backend verification successful!');
-          console.log('📦 API Response:', JSON.stringify(apiResponse, null, 2));
+          console.log('🎉 Complete authentication successful!');
+          console.log('🔑 Access token received:', !!authResult.access_token);
           
-          // Pass both Google and API response to success handler
+          // Pass both Google user info and auth result to success handler
           onGoogleSignInSuccess({
             ...userInfo,
-            apiResponse: apiResponse
+            user: authResult.user || user,
+            authResult: authResult,
+            access_token: authResult.access_token,
+            is_new_user: authResult.is_new_user
           });
           
         } catch (apiError: any) {
-          console.error('❌ Backend verification failed:', apiError);
+          console.error('❌ Google authentication failed:', apiError);
           Alert.alert(
-            'Verification Failed',
-            apiError.response?.data?.message || 'Failed to verify with server. Please try again.'
+            'Authentication Failed',
+            apiError.response?.data?.message || 'Failed to authenticate with server. Please try again.'
           );
           return;
         }
       } else {
         console.log('❌ SIGN-IN INCOMPLETE - NOT NAVIGATING');
-        console.log('❌ userInfo.type:', userInfo?.type);
-        console.log('❌ userInfo.data:', !!userInfo?.data);
-        console.log('❌ userInfo.data.user:', !!userInfo?.data?.user);
-        console.log('❌ userInfo.data.user.email:', !!userInfo?.data?.user?.email);
+        console.log('❌ user object:', !!user);
+        console.log('❌ user.email:', !!user?.email);
+        console.log('❌ idToken:', !!idToken);
       }
       
     } catch (error: any) {

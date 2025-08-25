@@ -16,9 +16,9 @@ import {AuthContext} from '../AuthContext';
 
 GoogleSignin.configure({
   webClientId:
-    '215325519739-mqhrsub07bllp648iistum7qap3v2t5l.apps.googleusercontent.com',
+    '60455306259-c9erh3v8qcn6pvjcd45a4848siakqfrs.apps.googleusercontent.com',
   iosClientId:
-    '215325519739-mqhrsub07bllp648iistum7qap3v2t5l.apps.googleusercontent.com',
+    '60455306259-c9erh3v8qcn6pvjcd45a4848siakqfrs.apps.googleusercontent.com',
   scopes: ['profile', 'email'],
 });
 

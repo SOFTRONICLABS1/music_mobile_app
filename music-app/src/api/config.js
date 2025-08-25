@@ -15,7 +15,7 @@ const API_CONFIG = {
 // API Endpoints
 export const API_ENDPOINTS = {
   AUTH: {
-    GOOGLE_VERIFY: '/auth/google-verify',
+    GOOGLE_VERIFY: '/auth/google-verify', 
     REFRESH_TOKEN: '/auth/refresh',
     LOGOUT: '/auth/logout',
   },

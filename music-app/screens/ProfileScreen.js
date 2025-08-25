@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, SafeAreaView, Text, Modal, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, SafeAreaView, Text, Modal, Image, ActivityIndicator, ActionSheet } from 'react-native';
 import { IconSymbol } from '../components/ui/IconSymbol';
 import { useTheme } from '../theme/ThemeContext';
+import { CommonActions, useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import authService from '../src/api/services/authService';
 
 const dummyUserData = {
-  username: 'MusicMaster2024',
-  email: 'alex.music@example.com',
   userSince: 'March 2023',
   level: 42,
-  bio: 'Music lover 🎵 Creating playlists and sharing musical experiences! Sing to play games 🎮',
-  location: 'San Francisco, CA',
   followers: 1247,
   following: 382,
   totalPlaylists: 5,
@@ -107,12 +107,55 @@ const dummyUserData = {
   ]
 };
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }) {
   const { theme } = useTheme();
-  const userData = dummyUserData;
+  const [userData, setUserData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  // Refresh profile data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchUserProfile();
+    }, [])
+  );
+
+  const fetchUserProfile = async () => {
+    try {
+      setIsLoading(true);
+      const userProfile = await authService.getCurrentUser();
+      console.log('👤 Profile API response:', userProfile);
+      console.log('📝 Bio from API:', userProfile.bio);
+      setUserData({
+        ...userProfile,
+        ...dummyUserData, // Merge with dummy data for fields not in API response
+        bio: userProfile.bio || '', // Use actual bio from API, empty if not set
+        location: userProfile.location || 'Not specified',
+      });
+    } catch (error) {
+      console.error('Failed to fetch user profile:', error);
+      Alert.alert(
+        'Error',
+        'Failed to load profile. Please try again.',
+        [{ text: 'OK' }]
+      );
+      // Fallback to dummy data
+      setUserData({
+        username: 'MusicMaster2024',
+        signup_username: 'Music Master',
+        email: 'user@example.com',
+        ...dummyUserData
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     setShowMenu(false);
@@ -124,9 +167,28 @@ export default function ProfileScreen() {
         {
           text: 'Logout',
           style: 'destructive',
-          onPress: () => {
-            // Navigate back to login
-            console.log('User logged out');
+          onPress: async () => {
+            try {
+              // Call logout API and clear storage
+              await authService.logout();
+              
+              // Reset navigation to Auth screen (root of stack)
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: 'Auth' }],
+                })
+              );
+            } catch (error) {
+              console.error('Logout error:', error);
+              // Even if logout fails, still navigate to auth
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: 'Auth' }],
+                })
+              );
+            }
           },
         },
       ]
@@ -141,6 +203,76 @@ export default function ProfileScreen() {
   const handleSupport = () => {
     setShowMenu(false);
     Alert.alert('Support', 'Contact support at support@musicapp.com');
+  };
+
+  const handleImageUpload = () => {
+    Alert.alert(
+      'Upload Profile Image',
+      'Choose an option',
+      [
+        { text: 'Camera', onPress: openCamera },
+        { text: 'Gallery', onPress: openGallery },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
+  const openGallery = () => {
+    const options = {
+      mediaType: 'photo',
+      quality: 0.8,
+      maxWidth: 800,
+      maxHeight: 800,
+    };
+
+    launchImageLibrary(options, (response) => {
+      if (response.didCancel) {
+        console.log('User cancelled gallery picker');
+      } else if (response.errorMessage) {
+        console.log('Gallery Error: ', response.errorMessage);
+        Alert.alert('Error', 'Failed to open gallery');
+      } else if (response.assets && response.assets[0]) {
+        const selectedImage = response.assets[0];
+        console.log('Selected image:', selectedImage);
+        
+        // Update userData with selected image temporarily (until API implementation)
+        setUserData(prev => ({
+          ...prev,
+          profile_image_url: selectedImage.uri
+        }));
+        
+        Alert.alert('Success', 'Profile image updated! (API implementation pending)');
+      }
+    });
+  };
+
+  const openCamera = () => {
+    const options = {
+      mediaType: 'photo',
+      quality: 0.8,
+      maxWidth: 800,
+      maxHeight: 800,
+    };
+
+    launchCamera(options, (response) => {
+      if (response.didCancel) {
+        console.log('User cancelled camera');
+      } else if (response.errorMessage) {
+        console.log('Camera Error: ', response.errorMessage);
+        Alert.alert('Error', 'Failed to open camera');
+      } else if (response.assets && response.assets[0]) {
+        const selectedImage = response.assets[0];
+        console.log('Captured image:', selectedImage);
+        
+        // Update userData with captured image temporarily (until API implementation)
+        setUserData(prev => ({
+          ...prev,
+          profile_image_url: selectedImage.uri
+        }));
+        
+        Alert.alert('Success', 'Profile image updated! (API implementation pending)');
+      }
+    });
   };
 
   const getDifficultyColor = (difficulty) => {
@@ -162,6 +294,27 @@ export default function ProfileScreen() {
     Alert.alert('Game Launch', `Starting ${gameName}...`);
   };
 
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+        <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!userData) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+        <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
+          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Failed to load profile</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -180,26 +333,30 @@ export default function ProfileScreen() {
         {/* Profile Section */}
         <View style={[styles.profileSection, { backgroundColor: theme.surface }]}>
           <View style={styles.profileHeader}>
-            <View style={styles.avatarContainer}>
-              <View style={[styles.avatarPlaceholder, { backgroundColor: theme.surfacePlus || theme.border }]}>
-                <IconSymbol name="person.fill" size={40} color={theme.textSecondary} />
-              </View>
-              <View style={[styles.levelBadge, { backgroundColor: theme.primary }]}>
-                <Text style={styles.levelText}>{userData.level}</Text>
-              </View>
-            </View>
+            <TouchableOpacity style={styles.avatarContainer} onPress={handleImageUpload}>
+              {userData.profile_image_url ? (
+                <Image 
+                  source={{ uri: userData.profile_image_url }} 
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <View style={[styles.avatarPlaceholder, { backgroundColor: theme.surfacePlus || theme.border }]}>
+                  <IconSymbol name="person.fill" size={40} color={theme.textSecondary} />
+                </View>
+              )}
+            </TouchableOpacity>
 
             <View style={styles.profileInfo}>
               <View style={styles.nameRow}>
-                <Text style={[styles.fullName, { color: theme.text }]}>{userData.username}</Text>
+                <Text style={[styles.fullName, { color: theme.text }]}>{userData.signup_username || userData.username}</Text>
               </View>
-              <Text style={[styles.email, { color: theme.textSecondary }]}>@{userData.email.split('@')[0]}</Text>
+              <Text style={[styles.email, { color: theme.textSecondary }]}>@{userData.username}</Text>
               
               {/* Edit Profile Button */}
               <View style={styles.buttonContainer}>
                 <TouchableOpacity 
                   style={[styles.editProfileButton, { backgroundColor: theme.surface, borderColor: theme.border }]} 
-                  onPress={() => Alert.alert('Edit Profile', 'Edit profile functionality coming soon!')}
+                  onPress={() => navigation.navigate('EditProfile')}
                 >
                   <Text style={[styles.editProfileButtonText, { color: theme.text }]}>Edit Profile</Text>
                 </TouchableOpacity>
@@ -207,7 +364,9 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          <Text style={[styles.bio, { color: theme.textSecondary }]}>{userData.bio}</Text>
+          <Text style={[styles.bio, { color: theme.textSecondary }]}>
+            {userData.bio || 'No bio added yet'}
+          </Text>
 
           {/* Social Stats */}
           <View style={[styles.statsContainer, { borderTopColor: theme.border }]}>
@@ -342,12 +501,14 @@ export default function ProfileScreen() {
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.menuItem} onPress={handleSupport}>
-                <IconSymbol name="questionmark.circle.fill" size={20} color={theme.text} />
+                <IconSymbol name="lightbulb.fill" size={20} color={theme.primary} />
                 <Text style={[styles.menuText, { color: theme.text }]}>Help & Support</Text>
               </TouchableOpacity>
               
+              <View style={[styles.menuSeparator, { backgroundColor: theme.border }]} />
+              
               <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-                <IconSymbol name="rectangle.portrait.and.arrow.right" size={20} color={theme.error || '#FF3B30'} />
+                <IconSymbol name="xmark.circle.fill" size={20} color={theme.error || '#FF3B30'} />
                 <Text style={[styles.menuText, { color: theme.error || '#FF3B30' }]}>Logout</Text>
               </TouchableOpacity>
             </View>
@@ -402,20 +563,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  levelBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  levelText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   profileInfo: {
     flex: 1,
@@ -634,5 +785,19 @@ const styles = StyleSheet.create({
   menuText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  menuSeparator: {
+    height: 1,
+    marginVertical: 8,
+    marginHorizontal: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
   },
 });

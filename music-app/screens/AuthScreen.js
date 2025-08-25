@@ -10,25 +10,38 @@ export default function AuthScreen({ navigation }) {
     console.log('🎉 AuthScreen: handleGoogleSignInSuccess called!');
     console.log('🎉 UserInfo received:', JSON.stringify(userInfo, null, 2));
     
-    // Check if we have API response
-    if (userInfo.apiResponse) {
+    // Check if we have auth result
+    const authData = userInfo.authResult || userInfo.apiResponse;
+    
+    if (authData) {
       console.log('=== BACKEND API RESPONSE IN AUTHSCREEN ===');
-      console.log(JSON.stringify(userInfo.apiResponse, null, 2));
+      console.log(JSON.stringify(authData, null, 2));
       console.log('===========================================');
       
-      // Store auth token if available
-      if (userInfo.apiResponse.token || userInfo.apiResponse.access_token) {
-        const token = userInfo.apiResponse.token || userInfo.apiResponse.access_token;
-        // You can store this token in AsyncStorage or your auth context
-        console.log('🔐 Auth token received:', token?.substring(0, 30) + '...');
+      // Check if user is new or existing
+      const isNewUser = userInfo.is_new_user !== undefined ? userInfo.is_new_user : authData.is_new_user;
+      const user = authData.user || userInfo.user;
+      const hasUsername = user && user.username && user.username !== null;
+      
+      console.log('🆕 Is new user:', isNewUser);
+      console.log('👤 Has username:', hasUsername, 'Username:', user?.username);
+      
+      if (isNewUser === false && hasUsername) {
+        // Existing user with complete profile - go directly to main app
+        console.log('📱 Existing user with complete profile - navigating directly to Explore page...');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Tabs' }],
+        });
+        return;
       }
     }
     
-    console.log('🎉 About to navigate to WelcomeUser...');
-    // Skip response screen and navigate directly to welcome page
+    // New user or incomplete profile - go through onboarding
+    console.log('🎉 New user or incomplete profile - starting onboarding flow...');
     navigation.navigate('WelcomeUser');
     
-    console.log('🎉 Navigation.navigate called!');
+    console.log('🎉 Navigation completed!');
   };
 
   return (

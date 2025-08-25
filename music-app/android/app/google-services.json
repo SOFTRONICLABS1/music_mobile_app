@@ -7,17 +7,17 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:60455306259:android:1ff5423dc3b03059a26be6",
+        "mobilesdk_app_id": "1:60455306259:android:e6afae9f815dcbfca26be6",
         "android_client_info": {
-          "package_name": "com.musiclearning.app"
+          "package_name": "com.musicapp.android"
         }
       },
       "oauth_client": [
         {
-          "client_id": "60455306259-8apbrpu5br59v9n0e8hvr0au5f71991v.apps.googleusercontent.com",
+          "client_id": "60455306259-fldbtpf71m0m2ed8htvbaudltdp5lbs7.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.musiclearning.app",
+            "package_name": "com.musicapp.android",
             "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
           }
         },

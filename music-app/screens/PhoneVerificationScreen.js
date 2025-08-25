@@ -7,10 +7,12 @@ import {
   TextInput,
   ScrollView,
   Alert,
-  Text
+  Text,
+  ActivityIndicator
 } from 'react-native';
 import { IconSymbol } from '../components/ui/IconSymbol';
 import { useTheme } from '../theme/ThemeContext';
+import authService from '../src/api/services/authService';
 
 const countries = [
   { name: 'United States', code: 'US', dialCode: '+1', flag: '🇺🇸' },
@@ -30,15 +32,39 @@ export default function PhoneVerificationScreen({ navigation }) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [selectedCountry, setSelectedCountry] = useState(countries[6]);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
 
-  const handlePhoneSubmit = () => {
+  const handlePhoneSubmit = async () => {
     if (phoneNumber.length !== 10) {
       Alert.alert('Invalid Phone', 'Please enter exactly 10 digits');
       return;
     }
-    // Phone number accepted, move to next screen
-    console.log('Phone number accepted:', phoneNumber);
-    navigation.navigate('Tabs');
+    
+    setIsUpdatingPhone(true);
+    
+    try {
+      // Extract country code without the + sign
+      const countryCode = selectedCountry.dialCode.replace('+', '');
+      
+      // Update phone number via API
+      await authService.updatePhoneNumber(countryCode, phoneNumber);
+      
+      console.log('✅ Phone number updated successfully:', `${selectedCountry.dialCode}${phoneNumber}`);
+      
+      // Navigate to main app
+      navigation.navigate('Tabs');
+    } catch (error) {
+      console.error('Failed to update phone number:', error);
+      Alert.alert(
+        'Update Failed',
+        error.message || 'Failed to update phone number. Please try again.',
+        [
+          { text: 'OK', onPress: () => setIsUpdatingPhone(false) }
+        ]
+      );
+    } finally {
+      setIsUpdatingPhone(false);
+    }
   };
 
   const handleCountrySelect = (country) => {
@@ -109,22 +135,28 @@ export default function PhoneVerificationScreen({ navigation }) {
             <TouchableOpacity 
               style={[
                 styles.sendButton,
-                { backgroundColor: phoneNumber.length !== 10 ? theme.border : theme.primary }
+                { backgroundColor: (phoneNumber.length !== 10 || isUpdatingPhone) ? theme.border : theme.primary }
               ]} 
               onPress={handlePhoneSubmit}
-              disabled={phoneNumber.length !== 10}
+              disabled={phoneNumber.length !== 10 || isUpdatingPhone}
             >
-              <Text style={[
-                styles.sendButtonText,
-                { color: phoneNumber.length !== 10 ? theme.textSecondary : 'white' }
-              ]}>
-                Continue
-              </Text>
-              <IconSymbol 
-                name="arrow.right" 
-                size={20} 
-                color={phoneNumber.length !== 10 ? theme.textSecondary : "white"} 
-              />
+              {isUpdatingPhone ? (
+                <ActivityIndicator size="small" color={theme.textSecondary} />
+              ) : (
+                <>
+                  <Text style={[
+                    styles.sendButtonText,
+                    { color: phoneNumber.length !== 10 ? theme.textSecondary : 'white' }
+                  ]}>
+                    Continue
+                  </Text>
+                  <IconSymbol 
+                    name="arrow.right" 
+                    size={20} 
+                    color={phoneNumber.length !== 10 ? theme.textSecondary : "white"} 
+                  />
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </ScrollView>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   View, 
   StyleSheet, 
@@ -7,16 +7,23 @@ import {
   TextInput,
   ScrollView,
   Alert,
-  Text
+  Text,
+  ActivityIndicator
 } from 'react-native';
 import { IconSymbol } from '../components/ui/IconSymbol';
 import { useTheme } from '../theme/ThemeContext';
+import authService from '../src/api/services/authService';
 
 export default function UsernamePickerScreen({ navigation }) {
   const { theme } = useTheme();
   const [username, setUsername] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [isUsernameValid, setIsUsernameValid] = useState(false);
+  const [isUsernameAvailable, setIsUsernameAvailable] = useState(null);
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const [usernameError, setUsernameError] = useState('');
+  const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+  const debounceTimer = useRef(null);
 
   // Mock user data from sign-in (in real app, this would come from auth context)
   const userEmail = 'user@example.com';
@@ -35,25 +42,105 @@ export default function UsernamePickerScreen({ navigation }) {
     setSuggestions(baseSuggestions);
   }, []);
 
+  // Debounced username availability check
+  const checkUsernameAvailability = useCallback(async (usernameToCheck) => {
+    if (!usernameToCheck || usernameToCheck.length < 3) {
+      setIsUsernameAvailable(null);
+      return;
+    }
+
+    setIsCheckingUsername(true);
+    setUsernameError('');
+    
+    try {
+      const response = await authService.checkUsernameAvailability(usernameToCheck);
+      setIsUsernameAvailable(response.available);
+      
+      if (!response.available) {
+        setUsernameError(response.message || 'Username is not available');
+      }
+    } catch (error) {
+      console.error('Failed to check username:', error);
+      setUsernameError('Failed to check username availability');
+      setIsUsernameAvailable(null);
+    } finally {
+      setIsCheckingUsername(false);
+    }
+  }, []);
+
   useEffect(() => {
-    // Validate username (basic validation)
+    // Clear previous timer
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+
+    // Basic validation
     const isValid = username.length >= 3 && /^[a-zA-Z0-9_]+$/.test(username);
     setIsUsernameValid(isValid);
-  }, [username]);
+    
+    if (!isValid) {
+      setIsUsernameAvailable(null);
+      if (username.length > 0 && username.length < 3) {
+        setUsernameError('Username must be at least 3 characters');
+      } else if (username.length > 0 && !/^[a-zA-Z0-9_]+$/.test(username)) {
+        setUsernameError('Username can only contain letters, numbers, and underscores');
+      } else {
+        setUsernameError('');
+      }
+      return;
+    }
+
+    // Set up debounced API call (500ms delay)
+    debounceTimer.current = setTimeout(() => {
+      checkUsernameAvailability(username);
+    }, 500);
+
+    // Cleanup
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, [username, checkUsernameAvailability]);
 
   const handleSuggestionPress = (suggestion) => {
     setUsername(suggestion);
+    // The useEffect will automatically trigger the availability check
   };
 
-  const handleContinue = () => {
-    if (!isUsernameValid) {
-      Alert.alert('Invalid Username', 'Username must be at least 3 characters and contain only letters, numbers, and underscores.');
+  const handleContinue = async () => {
+    if (!isUsernameValid || !isUsernameAvailable) {
+      Alert.alert(
+        'Username Not Available', 
+        isUsernameAvailable === false 
+          ? 'This username is already taken. Please choose another one.'
+          : 'Please enter a valid and available username.'
+      );
       return;
     }
     
-    // Store username (in real app, save to user profile)
-    console.log('Selected username:', username);
-    navigation.navigate('PhoneVerification');
+    setIsUpdatingUsername(true);
+    
+    try {
+      // Update username via API
+      await authService.updateUsername(username);
+      
+      console.log('✅ Username updated successfully:', username);
+      
+      // Navigate to next screen
+      navigation.navigate('PhoneVerification');
+    } catch (error) {
+      console.error('Failed to update username:', error);
+      Alert.alert(
+        'Update Failed',
+        error.message || 'Failed to update username. Please try again.',
+        [
+          { text: 'OK', onPress: () => setIsUpdatingUsername(false) }
+        ]
+      );
+    } finally {
+      setIsUpdatingUsername(false);
+    }
   };
 
   return (
@@ -110,11 +197,29 @@ export default function UsernamePickerScreen({ navigation }) {
               maxLength={20}
             />
             {username.length > 0 && (
-              <IconSymbol 
-                name={isUsernameValid ? "checkmark.circle.fill" : "exclamationmark.circle.fill"} 
-                size={20} 
-                color={isUsernameValid ? theme.success || '#4CAF50' : theme.error || '#F44336'} 
-              />
+              isCheckingUsername ? (
+                <ActivityIndicator size="small" color={theme.primary} />
+              ) : (
+                <IconSymbol 
+                  name={
+                    isUsernameAvailable === true 
+                      ? "checkmark.circle.fill" 
+                      : isUsernameAvailable === false 
+                        ? "xmark.circle.fill"
+                        : isUsernameValid 
+                          ? "checkmark.circle" 
+                          : "exclamationmark.circle.fill"
+                  } 
+                  size={20} 
+                  color={
+                    isUsernameAvailable === true 
+                      ? theme.success || '#4CAF50' 
+                      : (isUsernameAvailable === false || !isUsernameValid)
+                        ? theme.error || '#F44336'
+                        : theme.textSecondary
+                  } 
+                />
+              )
             )}
           </View>
           
@@ -122,9 +227,22 @@ export default function UsernamePickerScreen({ navigation }) {
             <View style={styles.usernameStatus}>
               <Text style={[
                 styles.statusText,
-                { color: isUsernameValid ? (theme.success || '#4CAF50') : (theme.error || '#F44336') }
+                { 
+                  color: isUsernameAvailable === true 
+                    ? (theme.success || '#4CAF50') 
+                    : (isUsernameAvailable === false || usernameError) 
+                      ? (theme.error || '#F44336')
+                      : theme.textSecondary
+                }
               ]}>
-                {isUsernameValid ? '✓ Username looks good!' : '⚠ Username must be 3+ characters, letters, numbers, and underscores only'}
+                {isCheckingUsername 
+                  ? 'Checking availability...'
+                  : isUsernameAvailable === true 
+                    ? '✓ Username is available!'
+                    : isUsernameAvailable === false
+                      ? '✗ Username is already taken'
+                      : usernameError || (isUsernameValid ? 'Checking...' : '⚠ Username must be 3+ characters, letters, numbers, and underscores only')
+                }
               </Text>
             </View>
           )}
@@ -170,22 +288,28 @@ export default function UsernamePickerScreen({ navigation }) {
           <TouchableOpacity 
             style={[
               styles.continueButton,
-              { backgroundColor: !isUsernameValid ? theme.border : theme.primary }
+              { backgroundColor: (!isUsernameValid || !isUsernameAvailable || isCheckingUsername || isUpdatingUsername) ? theme.border : theme.primary }
             ]} 
             onPress={handleContinue}
-            disabled={!isUsernameValid}
+            disabled={!isUsernameValid || !isUsernameAvailable || isCheckingUsername || isUpdatingUsername}
           >
-            <Text style={[
-              styles.continueButtonText,
-              { color: !isUsernameValid ? theme.textSecondary : 'white' }
-            ]}>
-              Continue
-            </Text>
-            <IconSymbol 
-              name="arrow.right" 
-              size={20} 
-              color={!isUsernameValid ? theme.textSecondary : "white"} 
-            />
+            {isUpdatingUsername ? (
+              <ActivityIndicator size="small" color={theme.textSecondary} />
+            ) : (
+              <>
+                <Text style={[
+                  styles.continueButtonText,
+                  { color: (!isUsernameValid || !isUsernameAvailable || isCheckingUsername) ? theme.textSecondary : 'white' }
+                ]}>
+                  Continue
+                </Text>
+                <IconSymbol 
+                  name="arrow.right" 
+                  size={20} 
+                  color={(!isUsernameValid || !isUsernameAvailable || isCheckingUsername) ? theme.textSecondary : "white"} 
+                />
+              </>
+            )}
           </TouchableOpacity>
         </View>
       </View>

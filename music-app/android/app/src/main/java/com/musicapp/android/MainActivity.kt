@@ -1,4 +1,4 @@
-package com.musiclearning.app
+package com.musicapp.android
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

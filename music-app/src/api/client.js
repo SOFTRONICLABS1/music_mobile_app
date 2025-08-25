@@ -23,13 +23,13 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // Log request details
-    console.log('🚀 API Request:', {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      data: config.data,
-      headers: config.headers,
-    });
+    // Simple request logging
+    console.log(`API Endpoint: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    console.log(`Payload: ${JSON.stringify(config.data, null, 2) || 'No payload'}`);
+    console.log('Getting Response...........');
+    
+    // Store request timestamp
+    config.metadata = { startTime: Date.now() };
     
     return config;
   },
@@ -42,29 +42,19 @@ apiClient.interceptors.request.use(
 // Response interceptor for error handling
 apiClient.interceptors.response.use(
   (response) => {
-    // Log successful response
-    console.log('✅ API Response:', {
-      url: response.config.url,
-      status: response.status,
-      data: response.data,
-    });
+    // Simple response logging
+    console.log(`Raw Response: ${JSON.stringify(response.data, null, 2)}`);
     
     return response;
   },
   async (error) => {
-    // Log error response
-    console.error('❌ API Error:', {
-      url: error.config?.url,
-      status: error.response?.status,
-      message: error.response?.data?.message || error.message,
-      data: error.response?.data,
-    });
+    // Simple error response logging
+    console.log(`Raw Response: ${JSON.stringify(error.response?.data || { error: error.message }, null, 2)}`);
     
     // Handle 401 - Unauthorized
     if (error.response?.status === 401) {
-      // Clear token and redirect to login
       await AsyncStorage.removeItem('authToken');
-      // You can dispatch a logout action here if using Redux/Context
+      console.log('🔒 Token cleared due to 401 Unauthorized');
     }
     
     return Promise.reject(error);
