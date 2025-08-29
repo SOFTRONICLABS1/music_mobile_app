@@ -21,6 +21,7 @@ import PhoneVerificationScreen from './screens/PhoneVerificationScreen';
 import UserProfileScreen from './screens/UserProfileScreen';
 import GameScreen from './screens/GameScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
+import SettingsScreen from './screens/SettingsScreen';
 import TabNavigator from './navigation/TabNavigator';
 
 const Stack = createNativeStackNavigator();
@@ -36,7 +37,11 @@ function App() {
       iosClientId: '60455306259-c9erh3v8qcn6pvjcd45a4848siakqfrs.apps.googleusercontent.com',
       offlineAccess: true,
       scopes: ['profile', 'email'],
+      forceCodeForRefreshToken: true, // Forces account picker on Android
     });
+
+    // Firebase token service will be loaded on-demand during sign-in
+    console.log('🔥 Firebase token service ready (on-demand loading)');
   }, []);
 
   // Check for existing authentication token
@@ -45,8 +50,8 @@ function App() {
       setIsCheckingAuth(true);
       console.log('=================== Checking Authentication Status ===================');
       
-      const token = await AsyncStorage.getItem('authToken');
-      const userData = await AsyncStorage.getItem('userData');
+      const token = await AsyncStorage.getItem('access_token');
+      const userData = await AsyncStorage.getItem('user_data');
       
       console.log('🔑 Stored token exists:', !!token);
       
@@ -64,8 +69,8 @@ function App() {
         } else {
           console.log('⚠️ User authenticated but missing username - clearing auth');
           // Clear incomplete auth data
-          await AsyncStorage.removeItem('authToken');
-          await AsyncStorage.removeItem('userData');
+          await AsyncStorage.removeItem('access_token');
+          await AsyncStorage.removeItem('user_data');
         }
       }
       
@@ -128,6 +133,7 @@ function App() {
             <Stack.Screen name="UserProfile" component={UserProfileScreen} />
             <Stack.Screen name="Game" component={GameScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="Tabs" component={TabNavigator} />
           </Stack.Navigator>
         </NavigationContainer>
@@ -154,6 +160,7 @@ function App() {
           <Stack.Screen name="UserProfile" component={UserProfileScreen} />
           <Stack.Screen name="Game" component={GameScreen} />
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="Tabs" component={TabNavigator} />
         </Stack.Navigator>
       </NavigationContainer>

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { FlatList, Dimensions, View } from 'react-native';
+import { FlatList, Dimensions, View, StatusBar, Platform } from 'react-native';
 import { GamePreview } from './GamePreview';
 
 const mockMusicVideoReels = [
@@ -85,7 +85,9 @@ const mockMusicVideoReels = [
   },
 ];
 
-const { height: screenHeight } = Dimensions.get('window');
+const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
+const statusBarHeight = Platform.OS === 'ios' ? 0 : StatusBar.currentHeight || 0;
+const actualHeight = screenHeight;
 
 export const GamesList = ({ navigation }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -105,30 +107,47 @@ export const GamesList = ({ navigation }) => {
     <GamePreview musicVideoReel={item} navigation={navigation} />
   );
 
+  const itemHeight = actualHeight - (Platform.OS === 'ios' ? 100 : 80);
+  
   const getItemLayout = (_, index) => ({
-    length: screenHeight - 150,
-    offset: (screenHeight - 150) * index,
+    length: itemHeight,
+    offset: itemHeight * index,
     index,
   });
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: 'black' }}>
+      <StatusBar 
+        barStyle="light-content" 
+        backgroundColor="transparent" 
+        translucent={true} 
+      />
       <FlatList
         ref={flatListRef}
         data={mockMusicVideoReels}
-        renderItem={renderMusicVideoReel}
+        renderItem={({ item }) => (
+          <View style={{ height: itemHeight }}>
+            <GamePreview 
+              musicVideoReel={item} 
+              navigation={navigation}
+              itemHeight={itemHeight}
+            />
+          </View>
+        )}
         keyExtractor={(item) => item.id}
-        pagingEnabled
+        pagingEnabled={true}
         showsVerticalScrollIndicator={false}
-        snapToInterval={screenHeight - 150}
+        snapToInterval={itemHeight}
         snapToAlignment="start"
         decelerationRate="fast"
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         getItemLayout={getItemLayout}
-        removeClippedSubviews
-        maxToRenderPerBatch={2}
-        windowSize={3}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={1}
+        windowSize={2}
+        initialNumToRender={1}
+        bounces={false}
       />
     </View>
   );

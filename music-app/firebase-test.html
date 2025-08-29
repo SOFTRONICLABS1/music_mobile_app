@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Firebase Auth Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; background: #4285f4; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .token-box { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 4px; word-break: break-all; }
+        .api-result { background: #e8f5e8; padding: 15px; margin: 10px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Firebase Auth Test for Musically API</h1>
+    
+    <button onclick="signInWithGoogle()">Sign In with Google</button>
+    <button onclick="testAPI()">Test SSO API</button>
+    
+    <h3>Firebase ID Token:</h3>
+    <div id="tokenDisplay" class="token-box">Token will appear here...</div>
+    
+    <h3>API Response:</h3>
+    <div id="apiResponse" class="api-result">API response will appear here...</div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInWithPopup, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+        // Your Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyCPAPOy37WNjDYQWfijKZNu8MGp3o5h714",
+            authDomain: "signin-60f32.firebaseapp.com",
+            projectId: "signin-60f32",
+            storageBucket: "signin-60f32.firebasestorage.app",
+            messagingSenderId: "60455306259",
+            appId: "1:60455306259:web:YOUR_WEB_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        let currentIdToken = null;
+
+        // Sign in with Google
+        window.signInWithGoogle = async function() {
+            try {
+                const provider = new GoogleAuthProvider();
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+                
+                // Get Firebase ID token
+                currentIdToken = await user.getIdToken();
+                
+                document.getElementById('tokenDisplay').innerHTML = 
+                    '<strong>Firebase ID Token:</strong><br>' + currentIdToken;
+                
+                console.log('Firebase User:', user);
+                console.log('Firebase ID Token:', currentIdToken);
+                
+            } catch (error) {
+                console.error('Error signing in:', error);
+                document.getElementById('tokenDisplay').innerHTML = 'Error: ' + error.message;
+            }
+        }
+
+        // Test your API
+        window.testAPI = async function() {
+            if (!currentIdToken) {
+                alert('Please sign in first to get a Firebase ID token');
+                return;
+            }
+
+            try {
+                const response = await fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/auth/sso', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        id_token: currentIdToken,
+                        additional_details: {
+                            device_type: 'web',
+                            test_user: true
+                        }
+                    })
+                });
+
+                const data = await response.json();
+                
+                document.getElementById('apiResponse').innerHTML = 
+                    '<strong>Status:</strong> ' + response.status + '<br>' +
+                    '<strong>Response:</strong><br>' + JSON.stringify(data, null, 2);
+                
+                console.log('API Response:', data);
+                
+            } catch (error) {
+                console.error('API Error:', error);
+                document.getElementById('apiResponse').innerHTML = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

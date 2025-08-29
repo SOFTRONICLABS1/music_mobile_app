@@ -50,6 +50,17 @@ const iconMap: { [key: string]: string } = {
   'heart': '♡',
   'message': '💬',
   'exclamationmark.triangle': '⚠️',
+  'house': '⌂',
+  'house.fill': '⌂',
+  'homekit': '⌂',
+  'bell.fill': '🔔',
+  'envelope.fill': '✉️',
+  'moon.fill': '🌙',
+  'tv.fill': '📺',
+  'lock.fill': '🔒',
+  'shield.fill': '🛡️',
+  'chart.bar.fill': '📊',
+  'info.circle.fill': 'ℹ️',
 };
 
 export const IconSymbol: React.FC<IconSymbolProps> = ({ name, size, color }) => {

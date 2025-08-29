@@ -5,7 +5,7 @@
   "scripts": {
     "android": "./start-android.sh",
     "android:simple": "react-native run-android",
-    "ios": "npx react-native start --reset-cache & sleep 5 && npx react-native run-ios",
+    "ios": "./start-ios.sh",
     "ios:only": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",

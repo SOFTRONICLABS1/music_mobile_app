@@ -173,6 +173,7 @@ export default function ProfileScreen({ navigation }) {
               await authService.logout();
               
               // Reset navigation to Auth screen (root of stack)
+              // Since tokens are cleared, the app will start from welcome flow on next launch
               navigation.dispatch(
                 CommonActions.reset({
                   index: 0,
@@ -181,7 +182,7 @@ export default function ProfileScreen({ navigation }) {
               );
             } catch (error) {
               console.error('Logout error:', error);
-              // Even if logout fails, still navigate to auth
+              // Even if logout API fails, still navigate to auth since storage is cleared
               navigation.dispatch(
                 CommonActions.reset({
                   index: 0,
@@ -197,7 +198,7 @@ export default function ProfileScreen({ navigation }) {
 
   const handleSettings = () => {
     setShowMenu(false);
-    Alert.alert('Settings', 'Settings screen coming soon!');
+    navigation.navigate('Settings');
   };
 
   const handleSupport = () => {

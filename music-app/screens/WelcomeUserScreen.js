@@ -4,8 +4,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '../components/ui/IconSymbol';
 import { useTheme } from '../theme/ThemeContext';
 
-export default function WelcomeUserScreen({ navigation }) {
+export default function WelcomeUserScreen({ navigation, route }) {
   const { theme } = useTheme();
+  
+  // Get data passed from AuthScreen
+  const userInfo = route?.params?.userInfo || {};
+  const user = route?.params?.user || {};
+  const accessToken = route?.params?.accessToken;
 
   // Disable back navigation on this screen
   useFocusEffect(
@@ -32,7 +37,11 @@ export default function WelcomeUserScreen({ navigation }) {
   );
 
   const handleContinue = () => {
-    navigation.navigate('UsernamePicker');
+    navigation.navigate('UsernamePicker', {
+      userInfo: userInfo,
+      user: user,
+      accessToken: accessToken
+    });
   };
 
   return (

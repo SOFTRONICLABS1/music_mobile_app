@@ -12,9 +12,9 @@ import {
 } from 'react-native';
 import { IconSymbol } from '../components/ui/IconSymbol';
 import { useTheme } from '../theme/ThemeContext';
-import authService from '../src/api/services/authService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function UsernamePickerScreen({ navigation }) {
+export default function UsernamePickerScreen({ navigation, route }) {
   const { theme } = useTheme();
   const [username, setUsername] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -23,13 +23,23 @@ export default function UsernamePickerScreen({ navigation }) {
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [usernameError, setUsernameError] = useState('');
   const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+  const [accessToken, setAccessToken] = useState(null);
   const debounceTimer = useRef(null);
 
-  // Mock user data from sign-in (in real app, this would come from auth context)
-  const userEmail = 'user@example.com';
+  // Get user data from navigation params or storage
+  const userInfo = route?.params?.userInfo || {};
+  const user = route?.params?.user || userInfo.user || {};
+  const userEmail = user.email || 'user@example.com';
   const userEmailPrefix = userEmail.split('@')[0];
 
   useEffect(() => {
+    // Get access token from params or storage
+    const getAccessToken = async () => {
+      const token = route?.params?.accessToken || await AsyncStorage.getItem('access_token');
+      setAccessToken(token);
+    };
+    getAccessToken();
+
     // Generate username suggestions based on email
     const baseSuggestions = [
       userEmailPrefix,
@@ -44,7 +54,7 @@ export default function UsernamePickerScreen({ navigation }) {
 
   // Debounced username availability check
   const checkUsernameAvailability = useCallback(async (usernameToCheck) => {
-    if (!usernameToCheck || usernameToCheck.length < 3) {
+    if (!usernameToCheck || usernameToCheck.length < 3 || !accessToken) {
       setIsUsernameAvailable(null);
       return;
     }
@@ -53,11 +63,23 @@ export default function UsernamePickerScreen({ navigation }) {
     setUsernameError('');
     
     try {
-      const response = await authService.checkUsernameAvailability(usernameToCheck);
-      setIsUsernameAvailable(response.available);
+      const response = await fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/auth/check-username', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: usernameToCheck
+        })
+      });
       
-      if (!response.available) {
-        setUsernameError(response.message || 'Username is not available');
+      const data = await response.json();
+      setIsUsernameAvailable(data.available);
+      
+      if (!data.available) {
+        setUsernameError(data.message || 'Username is not available');
       }
     } catch (error) {
       console.error('Failed to check username:', error);
@@ -66,7 +88,7 @@ export default function UsernamePickerScreen({ navigation }) {
     } finally {
       setIsCheckingUsername(false);
     }
-  }, []);
+  }, [accessToken]);
 
   useEffect(() => {
     // Clear previous timer
@@ -122,13 +144,39 @@ export default function UsernamePickerScreen({ navigation }) {
     setIsUpdatingUsername(true);
     
     try {
-      // Update username via API
-      await authService.updateUsername(username);
+      // Update username via new API endpoint with Bearer token
+      const response = await fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/auth/update-username', {
+        method: 'PUT',
+        headers: {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: username
+        })
+      });
       
-      console.log('✅ Username updated successfully:', username);
+      const data = await response.json();
       
-      // Navigate to next screen
-      navigation.navigate('PhoneVerification');
+      if (response.ok) {
+        console.log('✅ Username updated successfully:', username);
+        
+        // Update stored user data
+        const userData = await AsyncStorage.getItem('user_data');
+        if (userData) {
+          const user = JSON.parse(userData);
+          user.username = username;
+          await AsyncStorage.setItem('user_data', JSON.stringify(user));
+        }
+        
+        // Navigate to next screen
+        navigation.navigate('PhoneVerification', {
+          accessToken: accessToken
+        });
+      } else {
+        throw new Error(data.message || 'Failed to update username');
+      }
     } catch (error) {
       console.error('Failed to update username:', error);
       Alert.alert(

@@ -7,9 +7,6 @@ import {
   Image, 
   Dimensions, 
   Animated, 
-  TextInput, 
-  ScrollView, 
-  Keyboard, 
   Alert 
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -28,10 +25,6 @@ export const GamePreview = ({ musicVideoReel, navigation }) => {
   const [following, setFollowing] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
   const [captionExpanded, setCaptionExpanded] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [searchResults, setSearchResults] = useState([]);
-  const searchInputRef = useRef(null);
   
   // Animation refs
   const likeScale = useRef(new Animated.Value(1)).current;
@@ -142,41 +135,6 @@ export const GamePreview = ({ musicVideoReel, navigation }) => {
     }
   };
 
-  const handleSearch = (text) => {
-    setSearchQuery(text);
-    if (text.length > 0) {
-      const mockResults = [
-        { id: '1', type: 'account', name: '@musiclover', followers: '12.5K' },
-        { id: '2', type: 'account', name: '@beatmaker', followers: '8.2K' },
-        { id: '3', type: 'song', name: 'Summer Vibes', artist: 'DJ Cool' },
-        { id: '4', type: 'song', name: 'Night Beats', artist: 'Producer X' },
-      ].filter(item => 
-        item.name.toLowerCase().includes(text.toLowerCase())
-      );
-      setSearchResults(mockResults);
-    } else {
-      setSearchResults([]);
-    }
-  };
-
-  const handleSearchFocus = () => {
-    setIsSearchFocused(true);
-  };
-
-  const handleSearchBlur = () => {
-    if (searchQuery.length === 0) {
-      setIsSearchFocused(false);
-      setSearchResults([]);
-    }
-  };
-
-  const handleResultPress = (result) => {
-    console.log('Selected:', result);
-    setSearchQuery('');
-    setSearchResults([]);
-    setIsSearchFocused(false);
-    Keyboard.dismiss();
-  };
 
   return (
     <View style={[styles.container, { height: screenHeight - 150, backgroundColor: AppColors.background }]}>
@@ -211,73 +169,6 @@ export const GamePreview = ({ musicVideoReel, navigation }) => {
           </View>
         </View>
 
-        {/* Search Bar Overlay */}
-        <View style={styles.searchOverlay}>
-          <View style={[
-            styles.searchContainer,
-            { 
-              backgroundColor: isSearchFocused ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.15)',
-              borderColor: 'rgba(255,255,255,0.2)'
-            }
-          ]}>
-            <IconSymbol 
-              name="magnifyingglass" 
-              size={18} 
-              color="rgba(255,255,255,0.8)" 
-            />
-            <TextInput
-              ref={searchInputRef}
-              style={[styles.searchInput, { color: 'white' }]}
-              placeholder="Search accounts, songs..."
-              placeholderTextColor="rgba(255,255,255,0.5)"
-              value={searchQuery}
-              onChangeText={handleSearch}
-              onFocus={handleSearchFocus}
-              onBlur={handleSearchBlur}
-              returnKeyType="search"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => {
-                setSearchQuery('');
-                setSearchResults([]);
-              }}>
-                <IconSymbol name="xmark.circle.fill" size={18} color="rgba(255,255,255,0.5)" />
-              </TouchableOpacity>
-            )}
-          </View>
-          
-          {/* Search Results Dropdown */}
-          {searchResults.length > 0 && isSearchFocused && (
-            <ScrollView 
-              style={[styles.searchResultsContainer, { backgroundColor: 'rgba(0,0,0,0.85)' }]}
-              keyboardShouldPersistTaps="handled"
-            >
-              {searchResults.map((result) => (
-                <TouchableOpacity
-                  key={result.id}
-                  style={styles.searchResultItem}
-                  onPress={() => handleResultPress(result)}
-                >
-                  <View style={styles.resultIcon}>
-                    <IconSymbol 
-                      name={result.type === 'account' ? 'person.fill' : 'music.note'} 
-                      size={16} 
-                      color={AppColors.primary} 
-                    />
-                  </View>
-                  <View style={styles.resultInfo}>
-                    <Text style={[styles.resultName, { color: 'white' }]}>
-                      {result.name}
-                    </Text>
-                    <Text style={[styles.resultSubtext, { color: 'rgba(255,255,255,0.6)' }]}>
-                      {result.type === 'account' ? `${result.followers} followers` : result.artist}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-        </View>
 
         <View style={styles.topGameTitle}>
           <Text style={[styles.topTitle, { color: 'white' }]}>{musicVideoReel.title}</Text>
@@ -439,70 +330,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  searchOverlay: {
-    position: 'absolute',
-    top: 10,
-    left: 16,
-    right: 16,
-    zIndex: 1000,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  searchResultsContainer: {
-    marginTop: 8,
-    borderRadius: 12,
-    maxHeight: 250,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  searchResultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-  resultIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  resultInfo: {
-    flex: 1,
-  },
-  resultName: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  resultSubtext: {
-    fontSize: 12,
-  },
   topGameTitle: {
     position: 'absolute',
-    top: 70,
+    top: 50,
     left: 16,
     right: 80,
   },
@@ -523,7 +353,7 @@ const styles = StyleSheet.create({
   },
   bottomContent: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 55,
     left: 16,
     right: 16,
   },

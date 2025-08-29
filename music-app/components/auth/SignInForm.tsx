@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, Pressable, StyleSheet, Alert, Platform } 
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { IconSymbol } from '../ui/IconSymbol';
 import { useTheme } from '../../theme/ThemeContext';
-import { authService } from '../../src/api';
 
 interface SignInFormProps {
   onGoogleSignInSuccess: (userInfo: any) => void;
@@ -21,49 +20,147 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onGoogleSignInSuccess })
       // Check if your device supports Google Play
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       
-      // Get the user's ID token
+      // Force sign out to ensure account picker shows on Android
+      try {
+        await GoogleSignin.signOut();
+        console.log('✅ Cleared previous Google sign-in state');
+      } catch (signOutError) {
+        console.log('ℹ️ No previous Google sign-in to clear');
+      }
+      
+      // Get the user's ID token - this will now show account picker
       const userInfo = await GoogleSignin.signIn();
       
-      console.log('=== GOOGLE SIGN-IN RESULT ===');
-      console.log('Full userInfo:', JSON.stringify(userInfo, null, 2));
-      console.log('userInfo type:', typeof userInfo);
-      console.log('userInfo exists:', !!userInfo);
+      console.log('----- Started Google Sign in ------------');
       
       // Check for successful sign-in (checking all possible response structures)
       const user = (userInfo as any)?.user || (userInfo as any)?.data?.user;
       const idToken = (userInfo as any)?.idToken || (userInfo as any)?.data?.idToken;
       
       if (userInfo && user && user.email && idToken) {
-        console.log('✅ SIGN-IN SUCCESSFUL - CALLING SUCCESS CALLBACK');
-        console.log('✅ User email:', user.email);
-        console.log('✅ ID Token:', idToken?.substring(0, 50) + '...');
         
-        // Call backend API for complete Google authentication flow
+        // Step 1: Generate Firebase token using Google ID token
+        let firebaseIdToken = null;
         try {
-          console.log('📡 Starting complete Google authentication flow...');
-          const authResult = await authService.googleSignIn(
-            idToken,
-            Platform.OS === 'ios' ? 'ios' : 'android',
-            user
-          );
+          const firebaseTokenServiceModule = await import('../../src/services/firebaseTokenService');
+          const firebaseTokenService = firebaseTokenServiceModule.default;
           
-          console.log('🎉 Complete authentication successful!');
-          console.log('🔑 Access token received:', !!authResult.access_token);
+          const firebaseResult = await firebaseTokenService.exchangeGoogleTokenForFirebaseToken(idToken);
+          firebaseIdToken = firebaseResult.firebaseIdToken;
           
-          // Pass both Google user info and auth result to success handler
-          onGoogleSignInSuccess({
-            ...userInfo,
-            user: authResult.user || user,
-            authResult: authResult,
-            access_token: authResult.access_token,
-            is_new_user: authResult.is_new_user
-          });
-          
-        } catch (apiError: any) {
-          console.error('❌ Google authentication failed:', apiError);
+        } catch (firebaseError: any) {
+          console.warn('Firebase token generation failed:', firebaseError.message || firebaseError);
+        }
+        
+        // Step 2: Call SSO API with Firebase ID token
+        if (firebaseIdToken) {
+          try {
+            console.log('------- Starting Firebase Token Validation ------------------');
+            
+            const ssoPayload = {
+              id_token: firebaseIdToken,
+              additional_details: {
+                platform: Platform.OS,
+                device_type: 'mobile',
+                user_email: user.email,
+                user_name: user.name
+              }
+            };
+
+            console.log('API: POST https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/auth/sso');
+            console.log('Payload:', JSON.stringify(ssoPayload, null, 2));
+            console.log('Getting Response..............');
+
+            const ssoResponse = await fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/auth/sso', {
+              method: 'POST',
+              headers: {
+                'accept': 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(ssoPayload)
+            });
+
+            const ssoResult = await ssoResponse.json();
+            
+            console.log('Raw Response:', JSON.stringify(ssoResult, null, 2));
+
+            // Step 3: Call database/auth/sso API with SSO response data
+            try {
+              console.log('--------- Generating Access token ------------');
+              
+              const databasePayload = {
+                uid: ssoResult.uid,
+                email: ssoResult.email,
+                email_verified: ssoResult.email_verified,
+                name: ssoResult.name,
+                picture: ssoResult.picture,
+                provider: ssoResult.provider,
+                additional_details: {
+                  platform: Platform.OS,
+                  device_type: 'mobile',
+                  user_email: user.email,
+                  user_name: user.name
+                }
+              };
+
+              console.log('API: POST https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/database/auth/sso');
+              console.log('Payload:', JSON.stringify(databasePayload, null, 2));
+
+              const databaseResponse = await fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/database/auth/sso', {
+                method: 'POST',
+                headers: {
+                  'accept': 'application/json',
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(databasePayload)
+              });
+
+              const databaseResult = await databaseResponse.json();
+              
+              // Store access token
+              if (databaseResult.access_token) {
+                console.log('Access token:', databaseResult.access_token);
+                
+                // Store tokens for future use
+                const AsyncStorage = await import('@react-native-async-storage/async-storage');
+                await AsyncStorage.default.setItem('access_token', databaseResult.access_token);
+                await AsyncStorage.default.setItem('refresh_token', databaseResult.refresh_token);
+                await AsyncStorage.default.setItem('user_data', JSON.stringify(databaseResult.user));
+              }
+
+              // Pass the complete result to success handler
+              onGoogleSignInSuccess({
+                ...userInfo,
+                user: databaseResult.user || user,
+                ssoResult: ssoResult,
+                databaseResult: databaseResult,
+                firebaseIdToken: firebaseIdToken,
+                access_token: databaseResult.access_token,
+                is_new_user: databaseResult.is_new_user,
+                status: databaseResponse.status
+              });
+              
+            } catch (databaseError: any) {
+              console.error('❌ Database API failed:', databaseError);
+              Alert.alert(
+                'Authentication Failed', 
+                'Failed to generate access token. Please try again.'
+              );
+              return;
+            }
+            
+          } catch (ssoError: any) {
+            console.error('❌ SSO API failed:', ssoError);
+            Alert.alert(
+              'Authentication Failed',
+              'Failed to validate with server. Please try again.'
+            );
+            return;
+          }
+        } else {
           Alert.alert(
             'Authentication Failed',
-            apiError.response?.data?.message || 'Failed to authenticate with server. Please try again.'
+            'Failed to generate Firebase token. Please try again.'
           );
           return;
         }

@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { IconSymbol } from '../components/ui/IconSymbol';
 import { useTheme } from '../theme/ThemeContext';
-import authService from '../src/api/services/authService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const countries = [
   { name: 'United States', code: 'US', dialCode: '+1', flag: '🇺🇸' },
@@ -27,16 +27,31 @@ const countries = [
   { name: 'Brazil', code: 'BR', dialCode: '+55', flag: '🇧🇷' },
 ];
 
-export default function PhoneVerificationScreen({ navigation }) {
+export default function PhoneVerificationScreen({ navigation, route }) {
   const { theme } = useTheme();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [selectedCountry, setSelectedCountry] = useState(countries[6]);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
+  const [accessToken, setAccessToken] = useState(null);
+
+  // Get access token from params or storage
+  React.useEffect(() => {
+    const getAccessToken = async () => {
+      const token = route?.params?.accessToken || await AsyncStorage.getItem('access_token');
+      setAccessToken(token);
+    };
+    getAccessToken();
+  }, []);
 
   const handlePhoneSubmit = async () => {
     if (phoneNumber.length !== 10) {
       Alert.alert('Invalid Phone', 'Please enter exactly 10 digits');
+      return;
+    }
+    
+    if (!accessToken) {
+      Alert.alert('Authentication Error', 'Please sign in again.');
       return;
     }
     
@@ -46,13 +61,39 @@ export default function PhoneVerificationScreen({ navigation }) {
       // Extract country code without the + sign
       const countryCode = selectedCountry.dialCode.replace('+', '');
       
-      // Update phone number via API
-      await authService.updatePhoneNumber(countryCode, phoneNumber);
+      // Update phone number via new API endpoint with Bearer token
+      const response = await fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/auth/update-phone', {
+        method: 'PUT',
+        headers: {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone_number: phoneNumber,
+          country_code: countryCode
+        })
+      });
       
-      console.log('✅ Phone number updated successfully:', `${selectedCountry.dialCode}${phoneNumber}`);
+      const data = await response.json();
       
-      // Navigate to main app
-      navigation.navigate('Tabs');
+      if (response.ok) {
+        console.log('✅ Phone number updated successfully:', `${selectedCountry.dialCode}${phoneNumber}`);
+        
+        // Update stored user data
+        const userData = await AsyncStorage.getItem('user_data');
+        if (userData) {
+          const user = JSON.parse(userData);
+          user.phone_number = phoneNumber;
+          user.country_code = countryCode;
+          await AsyncStorage.setItem('user_data', JSON.stringify(user));
+        }
+        
+        // Navigate to main app
+        navigation.navigate('Tabs');
+      } else {
+        throw new Error(data.message || 'Failed to update phone number');
+      }
     } catch (error) {
       console.error('Failed to update phone number:', error);
       Alert.alert(

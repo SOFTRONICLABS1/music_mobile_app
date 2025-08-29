@@ -14,13 +14,14 @@ import {
 } from 'react-native';
 import { IconSymbol } from '../components/ui/IconSymbol';
 import { useTheme } from '../theme/ThemeContext';
-import authService from '../src/api/services/authService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function EditProfileScreen({ navigation, route }) {
   const { theme } = useTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [userData, setUserData] = useState(null);
+  const [accessToken, setAccessToken] = useState(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -43,6 +44,15 @@ export default function EditProfileScreen({ navigation, route }) {
     fetchUserData();
   }, []);
 
+  // Get access token on component mount
+  useEffect(() => {
+    const getAccessToken = async () => {
+      const token = await AsyncStorage.getItem('access_token');
+      setAccessToken(token);
+    };
+    getAccessToken();
+  }, []);
+
   // Check if Save button should be enabled
   const isSaveButtonEnabled = () => {
     const hasValidUsername = usernameStatus.isValid === true || 
@@ -55,7 +65,30 @@ export default function EditProfileScreen({ navigation, route }) {
   const fetchUserData = async () => {
     try {
       setIsLoading(true);
-      const userProfile = await authService.getCurrentUser();
+      
+      // Get access token
+      const token = await AsyncStorage.getItem('access_token');
+      if (!token) {
+        Alert.alert('Authentication Error', 'Please sign in again.');
+        navigation.goBack();
+        return;
+      }
+
+      // Fetch user profile using new API
+      const response = await fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/auth/me', {
+        method: 'GET',
+        headers: {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        }
+      });
+
+      const userProfile = await response.json();
+
+      if (!response.ok) {
+        throw new Error(userProfile.message || 'Failed to fetch user profile');
+      }
+
       setUserData(userProfile);
       
       // Pre-populate form with current data
@@ -106,9 +139,26 @@ export default function EditProfileScreen({ navigation, route }) {
     try {
       setUsernameStatus({ isChecking: true, isValid: null, message: 'Checking...' });
       
-      const response = await authService.checkUsernameAvailability(username);
+      const token = await AsyncStorage.getItem('access_token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/auth/check-username', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: username
+        })
+      });
       
-      if (response.available) {
+      const data = await response.json();
+      
+      if (response.ok && data.available) {
         setUsernameStatus({
           isChecking: false,
           isValid: true,
@@ -118,7 +168,7 @@ export default function EditProfileScreen({ navigation, route }) {
         setUsernameStatus({
           isChecking: false,
           isValid: false,
-          message: 'Username is already taken'
+          message: data.message || 'Username is already taken'
         });
       }
     } catch (error) {
@@ -147,16 +197,35 @@ export default function EditProfileScreen({ navigation, route }) {
 
   const updateProfile = async () => {
     try {
-      const response = await authService.updateProfile({
-        bio: formData.bio,
-        profile_image_url: "",
-        instruments_taught: [],
-        years_of_experience: 0,
-        teaching_style: "",
-        location: ""
+      const token = await AsyncStorage.getItem('access_token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/auth/update-profile', {
+        method: 'PUT',
+        headers: {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bio: formData.bio,
+          profile_image_url: "",
+          instruments_taught: [],
+          years_of_experience: 0,
+          teaching_style: "",
+          location: ""
+        })
       });
 
-      return response;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to update profile');
+      }
+
+      return data;
     } catch (error) {
       console.error('Profile update failed:', error);
       throw error;
@@ -185,10 +254,32 @@ export default function EditProfileScreen({ navigation, route }) {
       }
 
       const promises = [];
+      const token = await AsyncStorage.getItem('access_token');
+      if (!token) {
+        Alert.alert('Authentication Error', 'Please sign in again.');
+        return;
+      }
 
       // Update username if changed
       if (formData.username !== userData?.username && usernameStatus.isValid) {
-        promises.push(authService.updateUsername(formData.username));
+        const usernamePromise = fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/auth/update-username', {
+          method: 'PUT',
+          headers: {
+            'accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username: formData.username
+          })
+        }).then(async (response) => {
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.message || 'Failed to update username');
+          }
+          return data;
+        });
+        promises.push(usernamePromise);
       }
 
       // Update bio if changed
@@ -202,7 +293,25 @@ export default function EditProfileScreen({ navigation, route }) {
       // Update phone number if changed
       if (formData.phoneNumber !== userData?.phone_number || 
           formData.countryCode !== userData?.country_code) {
-        promises.push(authService.updatePhoneNumber(formData.countryCode, formData.phoneNumber));
+        const phonePromise = fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/auth/update-phone', {
+          method: 'PUT',
+          headers: {
+            'accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            phone_number: formData.phoneNumber,
+            country_code: formData.countryCode
+          })
+        }).then(async (response) => {
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.message || 'Failed to update phone number');
+          }
+          return data;
+        });
+        promises.push(phonePromise);
       }
 
       if (promises.length === 0) {
