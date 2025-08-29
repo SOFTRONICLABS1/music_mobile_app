@@ -299,59 +299,28 @@ class AuthService {
   async getCurrentUser() {
     try {
       console.log('=================== Starting Get User Profile ===================');
-      
-      // Get the stored access token
-      const token = await AsyncStorage.getItem('access_token');
-      
-      if (!token) {
-        throw new Error('No authentication token found. Please sign in again.');
-      }
-
       console.log('👤 Fetching current user profile...');
       
-      let response;
-      try {
-        response = await fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/auth/me', {
-          method: 'GET',
-          headers: {
-            'accept': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          }
-        });
-      } catch (fetchError) {
-        console.error('🔍 Fetch failed with error:', fetchError);
-        console.error('🔍 Error message:', fetchError.message);
-        console.error('🔍 Error stack:', fetchError.stack);
-        throw fetchError;
-      }
-
-      console.log('🔍 Raw response status:', response.status);
-      console.log('🔍 Raw response headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
-
-      let data;
-      try {
-        data = await response.json();
-        console.log('🔍 Raw response data:', JSON.stringify(data, null, 2));
-      } catch (jsonError) {
-        console.error('❌ Failed to parse response as JSON:', jsonError);
-        const textData = await response.text();
-        console.log('🔍 Raw response as text:', textData);
-        throw new Error(`Server responded with status ${response.status}: ${textData}`);
-      }
-
-      if (response.ok) {
-        console.log('✅ User profile fetched successfully:', data);
-        console.log('=================== Get User Profile Completed ===================');
-        return data;
-      } else {
-        console.error('❌ API Error - Status:', response.status);
-        console.error('❌ API Error - Data:', JSON.stringify(data, null, 2));
-        throw new Error(data.message || 'Failed to fetch user profile');
-      }
+      const response = await apiClient.get(API_ENDPOINTS.AUTH.ME, {
+        timeout: 60000 // Increase timeout for this specific call
+      });
+      
+      console.log('✅ User profile fetched successfully:', response.data);
+      console.log('=================== Get User Profile Completed ===================');
+      return response.data;
     } catch (error) {
       console.log('=================== Get User Profile Failed ===================');
       console.error('Failed to fetch user profile:', error);
-      throw new Error(error.message || 'Failed to fetch user profile. Please try again.');
+      if (error.response) {
+        console.error('❌ Get User Profile Error Response:', error.response.data);
+        throw new Error(error.response.data.message || 'Failed to fetch user profile');
+      } else if (error.request) {
+        console.error('❌ No response received:', error.request);
+        throw new Error('No response from server. Please check your connection.');
+      } else {
+        console.error('❌ Error setting up request:', error.message);
+        throw new Error('Failed to fetch user profile. Please try again.');
+      }
     }
   }
 
@@ -367,27 +336,17 @@ class AuthService {
       const token = await AsyncStorage.getItem('access_token');
       
       if (token) {
-        // Call logout API with Bearer token
-        const response = await fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/auth/logout', {
-          method: 'POST',
-          headers: {
-            'accept': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          }
-        });
-
-        if (!response.ok) {
-          const data = await response.json();
-          console.warn('Logout API failed:', data.message || 'Unknown error');
-        } else {
+        try {
+          // Call logout API using apiClient
+          await apiClient.post(API_ENDPOINTS.AUTH.LOGOUT);
           console.log('✅ Logout API call successful');
+        } catch (apiError) {
+          console.warn('Logout API failed:', apiError.message || 'Unknown error');
         }
       }
       
       // Clear all stored authentication data
-      await AsyncStorage.removeItem('access_token');
-      await AsyncStorage.removeItem('refresh_token');  
-      await AsyncStorage.removeItem('user_data');
+      await AsyncStorage.multiRemove(['access_token', 'refresh_token', 'user_data']);
       
       console.log('🗑️ Cleared all authentication data from storage');
       console.log('=================== Logout Completed ===================');
@@ -399,9 +358,7 @@ class AuthService {
       
       // Even if API call fails, still clear local storage
       try {
-        await AsyncStorage.removeItem('access_token');
-        await AsyncStorage.removeItem('refresh_token');  
-        await AsyncStorage.removeItem('user_data');
+        await AsyncStorage.multiRemove(['access_token', 'refresh_token', 'user_data']);
         console.log('🗑️ Cleared local storage despite API failure');
       } catch (storageError) {
         console.error('Failed to clear storage:', storageError);

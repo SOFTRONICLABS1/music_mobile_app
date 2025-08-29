@@ -4,8 +4,8 @@
  */
 
 const API_CONFIG = {
-  BASE_URL: 'https://bs0vuup2h6.execute-api.us-east-1.amazonaws.com/api/v1',
-  TIMEOUT: 30000, // 30 seconds
+  BASE_URL: 'https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1',
+  TIMEOUT: 30000, // 60 seconds
   HEADERS: {
     'accept': 'application/json',
     'Content-Type': 'application/json',
@@ -16,8 +16,14 @@ const API_CONFIG = {
 export const API_ENDPOINTS = {
   AUTH: {
     GOOGLE_VERIFY: '/auth/google-verify', 
+    GOOGLE_VERIFIED: '/database/auth/sso',
+    CHECK_USERNAME: '/auth/check-username',
+    UPDATE_USERNAME: '/auth/update-username', 
+    UPDATE_PHONE: '/auth/update-phone',
+    UPDATE_PROFILE: '/auth/update-profile',
     REFRESH_TOKEN: '/auth/refresh',
     LOGOUT: '/auth/logout',
+    ME: '/auth/me',
   },
   USER: {
     PROFILE: '/user/profile',
