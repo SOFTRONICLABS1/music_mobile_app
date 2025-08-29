@@ -22,6 +22,7 @@ import UserProfileScreen from './screens/UserProfileScreen';
 import GameScreen from './screens/GameScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import CreatePostScreen from './screens/CreatePostScreen';
 import TabNavigator from './navigation/TabNavigator';
 
 const Stack = createNativeStackNavigator();
@@ -134,6 +135,7 @@ function App() {
             <Stack.Screen name="Game" component={GameScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="CreatePost" component={CreatePostScreen} />
             <Stack.Screen name="Tabs" component={TabNavigator} />
           </Stack.Navigator>
         </NavigationContainer>
@@ -161,6 +163,7 @@ function App() {
           <Stack.Screen name="Game" component={GameScreen} />
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="CreatePost" component={CreatePostScreen} />
           <Stack.Screen name="Tabs" component={TabNavigator} />
         </Stack.Navigator>
       </NavigationContainer>

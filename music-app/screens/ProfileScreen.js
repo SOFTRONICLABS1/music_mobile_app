@@ -114,6 +114,7 @@ export default function ProfileScreen({ navigation }) {
   const [showMenu, setShowMenu] = useState(false);
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [showContentCreation, setShowContentCreation] = useState(false);
 
   useEffect(() => {
     fetchUserProfile();
@@ -295,6 +296,17 @@ export default function ProfileScreen({ navigation }) {
     Alert.alert('Game Launch', `Starting ${gameName}...`);
   };
 
+  const handleContentCreation = (type) => {
+    setShowContentCreation(false);
+    switch (type) {
+      case 'post':
+        navigation.navigate('CreatePost');
+        break;
+      default:
+        break;
+    }
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
@@ -443,7 +455,15 @@ export default function ProfileScreen({ navigation }) {
 
         {/* My Playlists Section */}
         <View style={styles.playlistsSection}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>My Playlists</Text>
+          <View style={styles.playlistsHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>My Playlists</Text>
+            <TouchableOpacity 
+              style={[styles.createContentButton, { backgroundColor: theme.primary }]}
+              onPress={() => setShowContentCreation(true)}
+            >
+              <Text style={[styles.plusIcon, { color: 'white' }]}>+</Text>
+            </TouchableOpacity>
+          </View>
           
           {userData.playlists.map((playlist) => (
             <TouchableOpacity 
@@ -514,6 +534,49 @@ export default function ProfileScreen({ navigation }) {
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
+        </Modal>
+
+        {/* Content Creation Modal - Instagram Style */}
+        <Modal
+          visible={showContentCreation}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowContentCreation(false)}
+        >
+          <View style={styles.contentModalOverlay}>
+            <TouchableOpacity 
+              style={styles.contentModalBackdrop}
+              onPress={() => setShowContentCreation(false)}
+            />
+            <View style={[styles.contentCreationModal, { backgroundColor: theme.card || theme.surface, borderColor: theme.border }]}>
+              {/* Modal Header */}
+              <View style={[styles.contentModalHeader, { borderBottomColor: theme.border }]}>
+                <TouchableOpacity onPress={() => setShowContentCreation(false)}>
+                  <IconSymbol name="xmark" size={20} color={theme.textSecondary} />
+                </TouchableOpacity>
+                <Text style={[styles.contentModalTitle, { color: theme.text }]}>Create</Text>
+                <View style={{ width: 20 }} />
+              </View>
+
+              {/* Content Creation Options */}
+              <View style={styles.contentOptionsContainer}>
+                <TouchableOpacity 
+                  style={[styles.contentOption, { backgroundColor: theme.surface }]}
+                  onPress={() => handleContentCreation('post')}
+                >
+                  <View style={[styles.contentOptionIcon, { backgroundColor: theme.primary + '15' }]}>
+                    <Text style={[styles.postIcon, { color: theme.primary }]}>🎵</Text>
+                  </View>
+                  <View style={styles.contentOptionTextContainer}>
+                    <Text style={[styles.contentOptionTitle, { color: theme.text }]}>Post</Text>
+                    <Text style={[styles.contentOptionDescription, { color: theme.textSecondary }]}>
+                      Share your music content
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
         </Modal>
       </ScrollView>
     </SafeAreaView>
@@ -703,10 +766,31 @@ const styles = StyleSheet.create({
   playlistsSection: {
     padding: 20,
   },
+  playlistsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 16,
+  },
+  createContentButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  plusIcon: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    lineHeight: 22,
+  },
+  postIcon: {
+    fontSize: 24,
+    lineHeight: 24,
   },
   playlistCard: {
     borderRadius: 12,
@@ -800,5 +884,65 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
+  },
+  // Content Creation Button Styles
+  createButton: {
+    padding: 8,
+  },
+  // Content Creation Modal Styles
+  contentModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  contentModalBackdrop: {
+    flex: 1,
+  },
+  contentCreationModal: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    maxHeight: '70%',
+  },
+  contentModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+  },
+  contentModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  contentOptionsContainer: {
+    padding: 20,
+    paddingTop: 10,
+  },
+  contentOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  contentOptionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  contentOptionTextContainer: {
+    flex: 1,
+  },
+  contentOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  contentOptionDescription: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 });
