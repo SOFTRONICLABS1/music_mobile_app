@@ -144,7 +144,7 @@ export default function UsernamePickerScreen({ navigation, route }) {
     setIsUpdatingUsername(true);
     
     try {
-      // Update username via new API endpoint with Bearer token
+      // Update username via API endpoint with Bearer token
       const response = await fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/auth/update-username', {
         method: 'PUT',
         headers: {
@@ -177,6 +177,7 @@ export default function UsernamePickerScreen({ navigation, route }) {
       } else {
         throw new Error(data.message || 'Failed to update username');
       }
+      
     } catch (error) {
       console.error('Failed to update username:', error);
       Alert.alert(

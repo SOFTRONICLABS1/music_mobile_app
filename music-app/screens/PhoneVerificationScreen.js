@@ -61,7 +61,7 @@ export default function PhoneVerificationScreen({ navigation, route }) {
       // Extract country code without the + sign
       const countryCode = selectedCountry.dialCode.replace('+', '');
       
-      // Update phone number via new API endpoint with Bearer token
+      // Update phone number via API endpoint with Bearer token
       const response = await fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/auth/update-phone', {
         method: 'PUT',
         headers: {

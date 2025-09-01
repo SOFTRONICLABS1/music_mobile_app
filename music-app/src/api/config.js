@@ -5,7 +5,7 @@
 
 const API_CONFIG = {
   BASE_URL: 'https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1',
-  TIMEOUT: 30000, // 60 seconds
+  TIMEOUT: 5000, // 15 seconds
   HEADERS: {
     'accept': 'application/json',
     'Content-Type': 'application/json',
@@ -24,6 +24,10 @@ export const API_ENDPOINTS = {
     REFRESH_TOKEN: '/auth/refresh',
     LOGOUT: '/auth/logout',
     ME: '/auth/me',
+  },
+  CONTENT: {
+    GET_UPLOAD_URL: '/content/get-upload-url',
+    CREATE_WITH_S3_KEY: '/content/create-with-s3-key',
   },
   USER: {
     PROFILE: '/user/profile',
