@@ -7,17 +7,20 @@ import {
   Image, 
   Dimensions, 
   Animated, 
-  Alert 
+  Alert,
+  ActivityIndicator 
 } from 'react-native';
+import Video from 'react-native-video';
 import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '../ui/IconSymbol';
 import { formatNumber } from '../../utils/helpers';
 import { useTheme } from '../../theme/ThemeContext';
 import { AppColors } from '../../theme/Colors';
+import contentService from '../../src/api/services/contentService';
 
 const { height: screenHeight } = Dimensions.get('window');
 
-export const GamePreview = ({ musicVideoReel, navigation }) => {
+export const GamePreview = ({ musicVideoReel, navigation, showFollowButton = true, isScreenFocused = true, isCurrentItem = true }) => {
   const { theme } = useTheme();
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(musicVideoReel?.likes || 0);
@@ -25,37 +28,155 @@ export const GamePreview = ({ musicVideoReel, navigation }) => {
   const [following, setFollowing] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
   const [captionExpanded, setCaptionExpanded] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [currentVideoUrl, setCurrentVideoUrl] = useState(musicVideoReel?.videoUrl);
+  const [isRefreshingUrl, setIsRefreshingUrl] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(true);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [loadProgress, setLoadProgress] = useState(0);
   
   // Animation refs
   const likeScale = useRef(new Animated.Value(1)).current;
   const commentScale = useRef(new Animated.Value(1)).current;
+  const videoRef = useRef(null);
+
+  // Function to extract URL parameters manually (React Native compatible)
+  const getUrlParameter = (url, paramName) => {
+    try {
+      const urlParts = url.split('?');
+      if (urlParts.length < 2) return null;
+      
+      const queryString = urlParts[1];
+      const params = queryString.split('&');
+      
+      for (const param of params) {
+        const [key, value] = param.split('=');
+        if (decodeURIComponent(key) === paramName) {
+          return decodeURIComponent(value);
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error parsing URL parameter:', error);
+      return null;
+    }
+  };
+
+  // Function to check if S3 URL is expired
+  const isUrlExpired = (url) => {
+    if (!url || !url.includes('X-Amz-Expires')) return false;
+    
+    try {
+      const expires = getUrlParameter(url, 'X-Amz-Expires');
+      const dateParam = getUrlParameter(url, 'X-Amz-Date');
+      
+      if (!expires || !dateParam) return false;
+      
+      // Parse the X-Amz-Date parameter (format: YYYYMMDDTHHMMSSZ)
+      const year = parseInt(dateParam.substr(0, 4));
+      const month = parseInt(dateParam.substr(4, 2)) - 1; // Month is 0-indexed
+      const day = parseInt(dateParam.substr(6, 2));
+      const hour = parseInt(dateParam.substr(9, 2));
+      const minute = parseInt(dateParam.substr(11, 2));
+      const second = parseInt(dateParam.substr(13, 2));
+      
+      const signedDate = new Date(Date.UTC(year, month, day, hour, minute, second));
+      const expiryDate = new Date(signedDate.getTime() + (parseInt(expires) * 1000));
+      
+      console.log('🕒 URL expiry check:', {
+        expires: expires,
+        dateParam: dateParam,
+        signedDate: signedDate.toISOString(),
+        expiryDate: expiryDate.toISOString(),
+        now: new Date().toISOString(),
+        isExpired: Date.now() >= expiryDate.getTime()
+      });
+      
+      return Date.now() >= expiryDate.getTime();
+    } catch (error) {
+      console.error('Error checking URL expiry:', error);
+      return false;
+    }
+  };
+
+  // Function to refresh expired URL
+  const refreshVideoUrl = async () => {
+    if (!musicVideoReel?.contentId || isRefreshingUrl) return;
+    
+    try {
+      setIsRefreshingUrl(true);
+      console.log('🔄 Refreshing expired URL for content:', musicVideoReel.contentId);
+      console.log('🔄 Current URL:', currentVideoUrl);
+      
+      const contentDetails = await contentService.getContentDetails(musicVideoReel.contentId);
+      console.log('🔄 Content details response:', JSON.stringify(contentDetails, null, 2));
+      
+      const newUrl = contentDetails.download_url;
+      console.log('🔄 New URL from API:', newUrl);
+      
+      if (newUrl && newUrl !== currentVideoUrl) {
+        console.log('✅ New URL obtained, updating video source');
+        setCurrentVideoUrl(newUrl);
+      } else if (newUrl === currentVideoUrl) {
+        console.log('⚠️ New URL is same as current URL - no change needed');
+      } else {
+        console.log('⚠️ No download_url in content details response');
+      }
+    } catch (error) {
+      console.error('❌ Failed to refresh video URL:', error);
+      if (error.response) {
+        console.error('❌ API Error Response:', JSON.stringify(error.response.data, null, 2));
+      }
+    } finally {
+      setIsRefreshingUrl(false);
+    }
+  };
 
   // Early return after all hooks
   if (!musicVideoReel) return null;
 
+  // Reset video URL when content changes and check for expiry
+  useEffect(() => {
+    setCurrentVideoUrl(musicVideoReel?.videoUrl);
+    
+    // Reset video to beginning when content changes
+    if (videoRef.current) {
+      videoRef.current.seek(0);
+    }
+    
+    // Check if URL is expired and refresh if needed (only when screen focused and current item)
+    if (musicVideoReel?.videoUrl && isScreenFocused && isCurrentItem && isUrlExpired(musicVideoReel.videoUrl)) {
+      console.log('🕒 URL is expired, refreshing...');
+      refreshVideoUrl();
+    }
+  }, [musicVideoReel?.contentId, musicVideoReel?.videoUrl, isScreenFocused, isCurrentItem]);
+
   // Handle screen focus/blur to manage video playback
   useFocusEffect(
     React.useCallback(() => {
+      console.log('📱 Screen focused - starting video playback');
       setIsPlaying(true);
+      setIsMuted(false); // Unmute when screen is focused
       
       return () => {
+        console.log('📱 Screen blurred - stopping video playback');
         setIsPlaying(false);
+        setIsMuted(true); // Mute when leaving screen
+        // Force pause video when leaving screen
+        if (videoRef.current) {
+          console.log('🛑 Force stopping video via ref');
+        }
       };
     }, [])
   );
 
   const handlePlayPress = () => {
     if (musicVideoReel.isGameEnabled) {
-      if (!musicVideoReel.contentId || !musicVideoReel.gameId) {
-        Alert.alert('Error', 'Missing contentId or gameId parameters required for game launch');
-        return;
-      }
-      
-      // Navigate to Game screen
-      navigation.navigate('Game', {
+      // Navigate to Games screen to choose a game
+      navigation.navigate('Games', {
         contentId: musicVideoReel.contentId,
-        gameId: musicVideoReel.gameId,
-        gameTitle: musicVideoReel.title
+        contentTitle: musicVideoReel.title,
+        contentDescription: musicVideoReel.description
       });
     } else {
       Alert.alert('Playing', `Playing video: ${musicVideoReel.title}`);
@@ -111,7 +232,17 @@ export const GamePreview = ({ musicVideoReel, navigation }) => {
 
 
   const handleVideoTap = () => {
-    setIsPlaying(!isPlaying);
+    const newMuteState = !isMuted;
+    console.log('🎬 Video tap - toggling mute state to:', newMuteState);
+    
+    // Toggle mute/unmute
+    setIsMuted(newMuteState);
+    
+    if (newMuteState) {
+      console.log('🔇 Muting audio (video continues playing)');
+    } else {
+      console.log('🔊 Unmuting audio (video continues playing)');
+    }
   };
 
   const handleFollowPress = () => {
@@ -140,21 +271,120 @@ export const GamePreview = ({ musicVideoReel, navigation }) => {
     <View style={[styles.container, { height: screenHeight - 150, backgroundColor: AppColors.background }]}>
       <View style={[styles.gamePreview, { backgroundColor: AppColors.background }]}>
         
-        {/* Background image (replacing video for now) */}
-        <Image 
-          source={{ uri: musicVideoReel.thumbnailUrl }} 
-          style={styles.backgroundVideo}
-        />
+        {/* Background video with fallback to image */}
+        {currentVideoUrl && currentVideoUrl !== 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4' ? (
+          <Video
+            key={`video-${musicVideoReel?.contentId}-${isMuted}`}
+            ref={videoRef}
+            source={{ uri: currentVideoUrl }}
+            style={styles.backgroundVideo}
+            resizeMode="cover"
+            repeat={true}
+            paused={!isPlaying || !isScreenFocused || !isCurrentItem}  // Only play when playing AND screen focused AND current item
+            muted={isMuted || !isPlaying || !isScreenFocused || !isCurrentItem}  // Mute when not active
+            volume={isMuted || !isPlaying || !isScreenFocused || !isCurrentItem ? 0.0 : 1.0}  // Volume control
+            onError={(error) => {
+              console.error('Video playback error:', error);
+              // Check if error is due to expired URL, network issues, or 404 and refresh
+              const errorCode = error?.error?.code;
+              const errorDescription = error?.error?.localizedDescription || '';
+              const errorDomain = error?.error?.domain || '';
+              
+              // Handle various error conditions that might benefit from URL refresh
+              const shouldRefreshUrl = 
+                errorCode === -1100 || // NSURLErrorFileDoesNotExist (404)
+                errorCode === -1003 || // NSURLErrorCannotFindHost
+                errorCode === -1001 || // NSURLErrorTimedOut
+                errorDescription.toLowerCase().includes('not found') ||
+                errorDescription.toLowerCase().includes('expired') ||
+                errorDomain.includes('NSURLError');
+              
+              if (shouldRefreshUrl) {
+                console.log('🔄 Video error possibly due to expired/invalid URL, refreshing...', { errorCode, errorDescription });
+                refreshVideoUrl();
+              }
+            }}
+            onLoadStart={() => {
+              console.log('Video loading started:', currentVideoUrl);
+              setIsLoaded(false);
+              setIsBuffering(true);
+              setLoadProgress(0);
+            }}
+            onLoad={(data) => {
+              console.log('Video loaded successfully:', data);
+              setIsLoaded(true);
+              setIsBuffering(false);
+              setLoadProgress(100);
+              // Seek to beginning when new video loads
+              if (videoRef.current) {
+                videoRef.current.seek(0);
+              }
+            }}
+            onProgress={(data) => {
+              // Update load progress based on buffered duration
+              const progress = (data.currentTime / data.seekableDuration) * 100;
+              setLoadProgress(progress || 0);
+            }}
+            onBuffer={({ isBuffering: buffering }) => {
+              console.log('Video buffering:', buffering);
+              setIsBuffering(buffering);
+            }}
+            onReadyForDisplay={() => {
+              console.log('Video ready for display');
+              setIsLoaded(true);
+              setIsBuffering(false);
+            }}
+            poster={musicVideoReel.thumbnailUrl}
+            ignoreSilentSwitch="ignore"
+            playInBackground={false}
+            playWhenInactive={false}
+            audioOnly={false}
+            mixWithOthers="duck"
+            allowsExternalPlayback={false}
+            controls={false}
+            disableFocus={true}
+            bufferConfig={{
+              minBufferMs: 15000,        // Minimum buffer before playback starts
+              maxBufferMs: 50000,        // Maximum buffer size
+              bufferForPlaybackMs: 2500, // Buffer needed to resume after rebuffering
+              bufferForPlaybackAfterRebufferMs: 5000, // Buffer needed after initial rebuffer
+            }}
+            maxBitRate={2000000} // Limit bitrate for faster loading
+            onPlaybackStateChanged={(state) => {
+              console.log('Playback state changed:', state);
+            }}
+          />
+        ) : (
+          <Image 
+            source={{ uri: musicVideoReel.thumbnailUrl }} 
+            style={styles.backgroundVideo}
+          />
+        )}
         {/* Tap area for play/pause simulation */}
         <TouchableOpacity 
           style={styles.videoTapArea} 
           onPress={handleVideoTap}
           activeOpacity={1}
         >
-          {/* Pause indicator */}
-          {!isPlaying && (
-            <View style={styles.pauseIndicator}>
-              <IconSymbol name="play.fill" size={60} color="white" />
+          {/* Loading/Buffering indicator */}
+          {(isBuffering || !isLoaded) && (
+            <View style={styles.loadingIndicator}>
+              <ActivityIndicator size="large" color="white" />
+              <Text style={styles.loadingText}>
+                {isBuffering ? 'Buffering...' : 'Loading...'}
+              </Text>
+              {loadProgress > 0 && loadProgress < 100 && (
+                <View style={styles.progressBarContainer}>
+                  <View style={[styles.progressBar, { width: `${loadProgress}%` }]} />
+                </View>
+              )}
+            </View>
+          )}
+          
+          {/* Mute indicator */}
+          {isMuted && isLoaded && !isBuffering && (
+            <View style={styles.muteIndicator}>
+              <IconSymbol name="speaker.slash.fill" size={60} color="white" />
             </View>
           )}
         </TouchableOpacity>
@@ -190,23 +420,25 @@ export const GamePreview = ({ musicVideoReel, navigation }) => {
               <Text style={styles.username}>@{musicVideoReel.user.name}</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={[
-                styles.followButton, 
-                { 
-                  backgroundColor: following ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.9)',
-                  borderColor: 'rgba(255,255,255,0.3)'
-                }
-              ]} 
-              onPress={handleFollowPress}
-            >
-              <Text style={[
-                styles.followButtonText, 
-                { color: following ? 'white' : 'black' }
-              ]}>
-                {following ? 'Following' : 'Follow'}
-              </Text>
-            </TouchableOpacity>
+            {showFollowButton && (
+              <TouchableOpacity 
+                style={[
+                  styles.followButton, 
+                  { 
+                    backgroundColor: following ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.9)',
+                    borderColor: 'rgba(255,255,255,0.3)'
+                  }
+                ]} 
+                onPress={handleFollowPress}
+              >
+                <Text style={[
+                  styles.followButtonText, 
+                  { color: following ? 'white' : 'black' }
+                ]}>
+                  {following ? 'Following' : 'Follow'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
           
           <View style={styles.gameInfo}>
@@ -302,6 +534,43 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: 40,
     padding: 20,
+  },
+  muteIndicator: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 40,
+    padding: 20,
+  },
+  loadingIndicator: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -60 }, { translateY: -50 }],
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 15,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 120,
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  progressBarContainer: {
+    width: 80,
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 1.5,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: 'white',
+    borderRadius: 1.5,
   },
   videoOverlay: {
     position: 'absolute',
