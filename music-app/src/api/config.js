@@ -41,7 +41,7 @@ export const API_ENDPOINTS = {
     USER_PROGRESS: '/music/progress',
   },
   GAMES: {
-    LIST: '/games',
+    LIST: '/games/',
     GAME_DETAILS: (id) => `/games/${id}`,
     SUBMIT_SCORE: (id) => `/games/${id}/score`,
     LEADERBOARD: '/games/leaderboard',
