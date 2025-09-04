@@ -23,6 +23,12 @@ import GameScreen from './screens/GameScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import CreatePostScreen from './screens/CreatePostScreen';
+import PostDetailScreen from './screens/PostDetailScreen';
+import ContentViewerScreen from './screens/ContentViewerScreen';
+import UserExploreScreen from './screens/UserExploreScreen';
+import UserHomeScreen from './screens/UserHomeScreen';
+import GamesScreen from './screens/GamesScreen';
+import GamePayloadScreen from './screens/GamePayloadScreen';
 import TabNavigator from './navigation/TabNavigator';
 
 const Stack = createNativeStackNavigator();
@@ -136,6 +142,12 @@ function App() {
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="CreatePost" component={CreatePostScreen} />
+            <Stack.Screen name="PostDetail" component={PostDetailScreen} />
+            <Stack.Screen name="ContentViewer" component={ContentViewerScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="UserExplore" component={UserExploreScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="UserHome" component={UserHomeScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Games" component={GamesScreen} />
+            <Stack.Screen name="GamePayload" component={GamePayloadScreen} />
             <Stack.Screen name="Tabs" component={TabNavigator} />
           </Stack.Navigator>
         </NavigationContainer>
@@ -164,6 +176,12 @@ function App() {
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="CreatePost" component={CreatePostScreen} />
+          <Stack.Screen name="PostDetail" component={PostDetailScreen} />
+          <Stack.Screen name="ContentViewer" component={ContentViewerScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="UserExplore" component={UserExploreScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="UserHome" component={UserHomeScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Games" component={GamesScreen} />
+          <Stack.Screen name="GamePayload" component={GamePayloadScreen} />
           <Stack.Screen name="Tabs" component={TabNavigator} />
         </Stack.Navigator>
       </NavigationContainer>

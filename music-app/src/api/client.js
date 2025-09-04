@@ -23,10 +23,15 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // Simple request logging
-    console.log(`API Endpoint: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
-    console.log(`Payload: ${JSON.stringify(config.data, null, 2) || 'No payload'}`);
-    console.log('Getting Response...........');
+    // Generate unique request ID
+    const requestId = Math.random().toString(36).substr(2, 9);
+    config.requestId = requestId;
+    
+    // Detailed request logging
+    console.log(`[${requestId}] API Endpoint: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    console.log(`[${requestId}] Payload: ${JSON.stringify(config.data, null, 2) || 'No payload'}`);
+    console.log(`[${requestId}] 🔍 DEBUG: Full headers:`, JSON.stringify(config.headers, null, 2));
+    console.log(`[${requestId}] Getting Response...........`);
     
     // Store request timestamp
     config.metadata = { startTime: Date.now() };
@@ -59,7 +64,8 @@ const processQueue = (error, token = null) => {
 apiClient.interceptors.response.use(
   (response) => {
     // Simple response logging
-    console.log(`Raw Response: ${JSON.stringify(response.data, null, 2)}`);
+    const requestId = response.config?.requestId || 'unknown';
+    console.log(`[${requestId}] ✅ Raw Response:`, JSON.stringify(response.data, null, 2));
     
     return response;
   },
@@ -67,7 +73,8 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config;
     
     // Simple error response logging
-    console.log(`Raw Response: ${JSON.stringify(error.response?.data || { error: error.message }, null, 2)}`);
+    const requestId = originalRequest?.requestId || 'unknown';
+    console.log(`[${requestId}] ❌ Raw Response:`, JSON.stringify(error.response?.data || { error: error.message }, null, 2));
     
     // Handle 401 - Token expired
     if (error.response?.status === 401 && !originalRequest._retry) {

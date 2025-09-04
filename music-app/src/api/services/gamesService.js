@@ -8,14 +8,22 @@ import { API_ENDPOINTS } from '../config';
 
 class GamesService {
   /**
-   * Get available games
-   * @returns {Promise} List of games
+   * Get available games with pagination
+   * @param {number} page - Page number (default: 1)
+   * @param {number} perPage - Items per page (default: 20)
+   * @returns {Promise} List of games with pagination info
    */
-  async getGames() {
+  async getGames(page = 1, perPage = 20) {
     try {
       console.log('🎮 Fetching available games...');
+      console.log(`📄 Page: ${page}, Per Page: ${perPage}`);
       
-      const response = await apiClient.get(API_ENDPOINTS.GAMES.LIST);
+      const response = await apiClient.get(API_ENDPOINTS.GAMES.LIST, {
+        params: {
+          page,
+          per_page: perPage
+        }
+      });
       
       console.log('=== GAMES API RESPONSE ===');
       console.log(JSON.stringify(response.data, null, 2));
@@ -27,6 +35,40 @@ class GamesService {
       console.error('Status:', error.response?.status);
       console.error('Error Data:', error.response?.data);
       console.error('=======================');
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Get games for specific content (User Suggested Games)
+   * @param {string} contentId - Content ID
+   * @param {number} page - Page number (default: 1)
+   * @param {number} perPage - Items per page (default: 20)
+   * @returns {Promise} Games for the content
+   */
+  async getContentGames(contentId, page = 1, perPage = 20) {
+    try {
+      console.log(`🎯 Fetching games for content: ${contentId}`);
+      console.log(`📄 Page: ${page}, Per Page: ${perPage}`);
+      
+      const response = await apiClient.get(`/content/${contentId}/games`, {
+        params: {
+          page,
+          per_page: perPage
+        }
+      });
+      
+      console.log('=== CONTENT GAMES API RESPONSE ===');
+      console.log(JSON.stringify(response.data, null, 2));
+      console.log('==================================');
+      
+      return response.data;
+    } catch (error) {
+      console.error('=== CONTENT GAMES API ERROR ===');
+      console.error('Status:', error.response?.status);
+      console.error('Error Data:', error.response?.data);
+      console.error('===============================');
       
       throw error;
     }

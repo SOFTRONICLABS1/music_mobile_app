@@ -8,10 +8,12 @@ import {
   TouchableOpacity, 
   Text,
   Image,
-  FlatList
+  FlatList,
+  ActivityIndicator
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { IconSymbol } from '../components/ui/IconSymbol';
+import searchService from '../src/api/services/searchService';
 
 // Mock data for search results
 const mockAccounts = [
@@ -58,28 +60,52 @@ export default function ExploreScreen({ navigation }) {
   const { theme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredContent, setFilteredContent] = useState(dummyContent);
-  const [activeSearchTab, setActiveSearchTab] = useState('For You');
+  const [activeSearchTab, setActiveSearchTab] = useState('All');
   const [searchResults, setSearchResults] = useState({
-    accounts: [],
-    musicVideos: [],
+    users: [],
+    content: [],
     tags: [],
-    forYou: []
+    games: []
   });
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState(null);
 
-  const handleSearch = (text) => {
+  const handleSearch = async (text) => {
     setSearchQuery(text);
+    setSearchError(null);
+    
     if (text.trim() === '') {
       setFilteredContent(dummyContent);
-      setSearchResults({ accounts: [], musicVideos: [], tags: [], forYou: [] });
-    } else {
-      // Filter content for regular grid view
+      setSearchResults({ users: [], content: [], tags: [], games: [] });
+      return;
+    }
+
+    setIsSearching(true);
+    
+    try {
+      // Call real search API
+      const results = await searchService.search(text.trim(), 1, 20);
+      
+      setSearchResults({
+        users: results.users || [],
+        content: results.content || [],
+        tags: mockTags.filter(tag => 
+          tag.name.toLowerCase().includes(text.toLowerCase())
+        ), // For now using mock tags since API doesn't return tags
+        games: results.games || []
+      });
+      
+      // Also filter dummy content for grid view when not searching
       const filtered = dummyContent.filter(content => 
         content.title.toLowerCase().includes(text.toLowerCase()) ||
         content.type.toLowerCase().includes(text.toLowerCase())
       );
       setFilteredContent(filtered);
       
-      // Mock search results for Instagram-style search
+    } catch (error) {
+      console.error('Search failed:', error);
+      setSearchError('Search failed. Please try again.');
+      // Fallback to mock data
       const query = text.toLowerCase();
       const filteredAccounts = mockAccounts.filter(account => 
         account.username.toLowerCase().includes(query) ||
@@ -92,17 +118,26 @@ export default function ExploreScreen({ navigation }) {
       const filteredTags = mockTags.filter(tag => 
         tag.name.toLowerCase().includes(query)
       );
-      const forYouResults = [
-        ...filteredVideos.slice(0, 3).map(item => ({ ...item, resultType: 'video' })),
-        ...filtered.slice(0, 2).map(item => ({ ...item, resultType: 'content' }))
-      ];
       
       setSearchResults({
-        accounts: filteredAccounts,
-        musicVideos: filteredVideos,
+        users: filteredAccounts.map(user => ({
+          id: user.id,
+          username: user.username,
+          signup_username: user.name,
+          profile_image_url: user.avatar,
+          total_subscribers: user.followers,
+          is_verified: user.isVerified
+        })),
+        content: filteredVideos.map(video => ({
+          id: video.id,
+          title: video.title,
+          description: `Video by @${video.creator}`,
+        })),
         tags: filteredTags,
-        forYou: forYouResults
+        games: [] // No mock games for fallback
       });
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -144,48 +179,68 @@ export default function ExploreScreen({ navigation }) {
     </TouchableOpacity>
   );
   
-  const renderAccountItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.accountItem}
-      onPress={() => console.log('Navigate to account:', item.username)}
-    >
-      <Image source={{ uri: item.avatar }} style={styles.accountAvatar} />
-      <View style={styles.accountInfo}>
-        <View style={styles.accountHeader}>
-          <Text style={[styles.accountName, { color: theme.text }]}>{item.name}</Text>
-          {item.isVerified && <Text style={styles.verifiedBadge}>✓</Text>}
+  const renderAccountItem = ({ item }) => {
+    const avatarUrl = item.profile_image_url || `https://picsum.photos/50/50?random=${item.id}`;
+    const displayName = item.signup_username || item.username;
+    const followerCount = item.total_subscribers || 0;
+    
+    return (
+      <TouchableOpacity 
+        style={styles.accountItem}
+        onPress={() => console.log('Navigate to account:', item.username)}
+      >
+        <Image source={{ uri: avatarUrl }} style={styles.accountAvatar} />
+        <View style={styles.accountInfo}>
+          <View style={styles.accountHeader}>
+            <Text style={[styles.accountName, { color: theme.text }]}>{displayName}</Text>
+            {item.is_verified && <Text style={styles.verifiedBadge}>✓</Text>}
+          </View>
+          <Text style={[styles.accountUsername, { color: theme.textSecondary }]}>@{item.username}</Text>
+          <Text style={[styles.accountFollowers, { color: theme.textTertiary }]}>
+            {followerCount > 1000 ? `${(followerCount/1000).toFixed(1)}K` : followerCount} followers
+          </Text>
         </View>
-        <Text style={[styles.accountUsername, { color: theme.textSecondary }]}>@{item.username}</Text>
-        <Text style={[styles.accountFollowers, { color: theme.textTertiary }]}>
-          {item.followers > 1000 ? `${(item.followers/1000).toFixed(1)}K` : item.followers} followers
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
   
-  const renderMusicVideoItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.musicVideoItem}
-      onPress={() => console.log('Navigate to video:', item.title)}
-    >
-      <View style={styles.musicVideoThumbnailContainer}>
-        <Image source={{ uri: item.thumbnail }} style={styles.musicVideoThumbnail} />
-        <View style={styles.musicVideoOverlay}>
-          <Text style={styles.musicVideoDuration}>{item.duration}</Text>
+  const renderMusicVideoItem = ({ item }) => {
+    const thumbnailUrl = `https://picsum.photos/200/200?random=${item.id}`;
+    const playCount = item.play_count || 0;
+    const isVideo = item.media_type === 'video';
+    
+    return (
+      <TouchableOpacity 
+        style={styles.musicVideoItem}
+        onPress={() => console.log('Navigate to content:', item.title)}
+      >
+        <View style={styles.musicVideoThumbnailContainer}>
+          <Image source={{ uri: thumbnailUrl }} style={styles.musicVideoThumbnail} />
+          <View style={styles.musicVideoOverlay}>
+            <Text style={styles.musicVideoDuration}>{isVideo ? '🎬' : '🎵'}</Text>
+          </View>
         </View>
-      </View>
-      <View style={styles.musicVideoInfo}>
-        <Text style={[styles.musicVideoTitle, { color: theme.text }]} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <Text style={[styles.musicVideoCreator, { color: theme.textSecondary }]}>@{item.creator}</Text>
-        <View style={styles.musicVideoStats}>
-          <Text style={[styles.musicVideoStat, { color: theme.textTertiary }]}>❤️ {item.likes}</Text>
-          <Text style={[styles.musicVideoStat, { color: theme.textTertiary }]}>👁 {item.views}</Text>
+        <View style={styles.musicVideoInfo}>
+          <Text style={[styles.musicVideoTitle, { color: theme.text }]} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text style={[styles.musicVideoCreator, { color: theme.textSecondary }]} numberOfLines={1}>
+            {item.description}
+          </Text>
+          <View style={styles.musicVideoStats}>
+            <Text style={[styles.musicVideoStat, { color: theme.textTertiary }]}>
+              👁 {playCount > 1000 ? `${(playCount/1000).toFixed(1)}K` : playCount} plays
+            </Text>
+            {item.tempo && (
+              <Text style={[styles.musicVideoStat, { color: theme.textTertiary }]}>
+                🎵 {item.tempo} BPM
+              </Text>
+            )}
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
   
   const renderTagItem = ({ item }) => (
     <TouchableOpacity 
@@ -203,9 +258,26 @@ export default function ExploreScreen({ navigation }) {
       </View>
     </TouchableOpacity>
   );
+
+  const renderGameItem = ({ item }) => (
+    <TouchableOpacity 
+      style={styles.tagItem}
+      onPress={() => console.log('Navigate to game:', item.title)}
+    >
+      <View style={styles.tagIconContainer}>
+        <Text style={styles.tagIcon}>🎮</Text>
+      </View>
+      <View style={styles.tagInfo}>
+        <Text style={[styles.tagName, { color: theme.text }]}>{item.title}</Text>
+        <Text style={[styles.tagCount, { color: theme.textSecondary }]}>
+          {item.description}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
   
   const renderSearchTabs = () => {
-    const tabs = ['For You', 'Accounts', 'Music Videos', 'Tags'];
+    const tabs = ['All', 'Accounts', 'Music Videos', 'Tags', 'Games'];
     return (
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.searchTabsContainer}>
         {tabs.map((tab) => (
@@ -235,6 +307,92 @@ export default function ExploreScreen({ navigation }) {
     );
   };
   
+  const renderAllResults = () => {
+    if (isSearching) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Searching...</Text>
+        </View>
+      );
+    }
+
+    if (searchError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={[styles.errorText, { color: theme.textSecondary }]}>{searchError}</Text>
+        </View>
+      );
+    }
+
+    const hasResults = searchResults.users.length > 0 || 
+                      searchResults.content.length > 0 || 
+                      searchResults.tags.length > 0 || 
+                      searchResults.games.length > 0;
+
+    if (!hasResults) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+            No results found for "{searchQuery}"
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <ScrollView style={styles.allResultsContainer}>
+        {/* Accounts Section */}
+        {searchResults.users.length > 0 && (
+          <View style={styles.resultSection}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Accounts</Text>
+            {searchResults.users.slice(0, 3).map((item) => (
+              <View key={`account_${item.id}`}>
+                {renderAccountItem({ item })}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Music Videos Section */}
+        {searchResults.content.length > 0 && (
+          <View style={styles.resultSection}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Music Videos</Text>
+            {searchResults.content.slice(0, 3).map((item) => (
+              <View key={`video_${item.id}`}>
+                {renderMusicVideoItem({ item })}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Tags Section */}
+        {searchResults.tags.length > 0 && (
+          <View style={styles.resultSection}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Tags</Text>
+            {searchResults.tags.slice(0, 3).map((item) => (
+              <View key={`tag_${item.id}`}>
+                {renderTagItem({ item })}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Games Section */}
+        {searchResults.games.length > 0 && (
+          <View style={styles.resultSection}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Games</Text>
+            {searchResults.games.slice(0, 3).map((item) => (
+              <View key={`game_${item.id}`}>
+                {renderGameItem({ item })}
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    );
+  };
+
   const renderSearchResults = () => {
     if (searchQuery.trim() === '') return null;
     
@@ -242,32 +400,62 @@ export default function ExploreScreen({ navigation }) {
     let renderItem = null;
     
     switch (activeSearchTab) {
-      case 'For You':
-        data = searchResults.forYou;
-        renderItem = renderContentItem;
-        break;
+      case 'All':
+        // For All tab, we'll show all results in sections
+        return renderAllResults();
       case 'Accounts':
-        data = searchResults.accounts;
+        data = searchResults.users;
         renderItem = renderAccountItem;
         break;
       case 'Music Videos':
-        data = searchResults.musicVideos;
+        data = searchResults.content;
         renderItem = renderMusicVideoItem;
         break;
       case 'Tags':
         data = searchResults.tags;
         renderItem = renderTagItem;
         break;
+      case 'Games':
+        data = searchResults.games;
+        renderItem = renderGameItem;
+        break;
       default:
-        data = searchResults.forYou;
-        renderItem = renderContentItem;
+        data = searchResults.users;
+        renderItem = renderAccountItem;
+    }
+
+    if (isSearching) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Searching...</Text>
+        </View>
+      );
+    }
+
+    if (searchError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={[styles.errorText, { color: theme.textSecondary }]}>{searchError}</Text>
+        </View>
+      );
+    }
+
+    if (data.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+            No {activeSearchTab.toLowerCase()} found for "{searchQuery}"
+          </Text>
+        </View>
+      );
     }
     
     return (
       <FlatList
         data={data}
         renderItem={renderItem}
-        keyExtractor={(item) => `${activeSearchTab}_${item.resultType || 'default'}_${item.id}`}
+        keyExtractor={(item) => `${activeSearchTab}_${item.id}`}
         contentContainerStyle={styles.searchResultsContainer}
         showsVerticalScrollIndicator={false}
       />
@@ -449,7 +637,7 @@ const styles = StyleSheet.create({
   accountHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 1,
+    marginBottom: 0,
   },
   accountName: {
     fontSize: 14,
@@ -462,8 +650,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   accountUsername: {
-    fontSize: 14,
-    marginBottom: 1,
+    fontSize: 13,
+    marginBottom: 2,
   },
   accountFollowers: {
     fontSize: 13,
@@ -549,5 +737,54 @@ const styles = StyleSheet.create({
   },
   tagCount: {
     fontSize: 13,
+  },
+  // All Results Styles
+  allResultsContainer: {
+    flex: 1,
+  },
+  resultSection: {
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  // Loading, Error, and Empty States
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  emptyText: {
+    fontSize: 14,
+    textAlign: 'center',
   },
 });

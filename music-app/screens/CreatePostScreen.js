@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,8 @@ import {
   Alert,
   Image,
   Modal,
-  FlatList
+  FlatList,
+  ActivityIndicator
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import DocumentPicker from 'react-native-document-picker';
@@ -18,6 +19,8 @@ import { IconSymbol } from '../components/ui/IconSymbol';
 import { useTheme } from '../theme/ThemeContext';
 import API_CONFIG, { API_ENDPOINTS } from '../src/api/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import GamesPickerModal from '../components/GamesPickerModal';
+import gamesService from '../src/api/services/gamesService';
 
 // Sample music videos data
 const musicVideos = [
@@ -63,6 +66,9 @@ export default function CreatePostScreen({ navigation }) {
   const { theme } = useTheme();
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [showVideoSelector, setShowVideoSelector] = useState(false);
+  const [showGamesPickerModal, setShowGamesPickerModal] = useState(false);
+  const [games, setGames] = useState([]);
+  const [gamesLoading, setGamesLoading] = useState(false);
   const [notesFile, setNotesFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
@@ -71,7 +77,8 @@ export default function CreatePostScreen({ navigation }) {
     caption: '',
     notes: '',
     tempo: 120,  // Default tempo in BPM
-    suggestedGames: ''  // Comma-separated game names
+    suggestedGames: '',  // Display string for UI
+    selectedGameIds: []  // Array of game IDs for API
   });
 
   const handleVideoSelect = (video) => {
@@ -122,42 +129,102 @@ export default function CreatePostScreen({ navigation }) {
     });
   };
 
-  const handleNotesFileUpload = async () => {
-    try {
-      const result = await DocumentPicker.pickSingle({
-        type: [
-          DocumentPicker.types.plainText,
-          DocumentPicker.types.pdf,
-          'text/*',
-          'application/json'
-        ],
-        copyTo: 'documentDirectory'
-      });
-      
-      const selectedFile = {
-        name: result.name,
-        type: result.type,
-        uri: result.uri,
-        size: result.size
-      };
-      
-      setNotesFile(selectedFile);
-      Alert.alert('Success', `File "${result.name}" selected successfully!`);
-      
-    } catch (error) {
-      if (DocumentPicker.isCancel(error)) {
-        console.log('User cancelled file selection');
-      } else {
-        console.error('File picker error:', error);
-        Alert.alert('Error', 'Failed to select file. Please try again.');
+  // Fetch games when component mounts
+  useEffect(() => {
+    const fetchGames = async () => {
+      try {
+        setGamesLoading(true);
+        
+        // Check if user is authenticated
+        const token = await AsyncStorage.getItem('access_token');
+        console.log('🔍 DEBUG: Stored token exists:', !!token);
+        if (token) {
+          console.log('🔍 DEBUG: Token preview:', token.substring(0, 50) + '...');
+          
+          // Generate equivalent curl command
+          const curlCommand = `curl -X 'GET' \\
+  'https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/games/?page=1&per_page=20' \\
+  -H 'accept: application/json' \\
+  -H 'Authorization: Bearer ${token}'`;
+          
+          console.log('🔍 DEBUG: Equivalent curl command:');
+          console.log(curlCommand);
+        }
+        
+        if (!token) {
+          console.warn('No access token found - user may not be authenticated');
+          setGames([]);
+          return;
+        }
+        
+        // Use direct fetch instead of axios-based games service
+        console.log('🚀 Making direct fetch request...');
+        const directResponse = await fetch('https://24pw8gqd0i.execute-api.us-east-1.amazonaws.com/api/v1/games/?page=1&per_page=20', {
+          method: 'GET',
+          headers: {
+            'accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          }
+        });
+        
+        const directData = await directResponse.json();
+        console.log('✅ Direct fetch status:', directResponse.status);
+        console.log('✅ Direct fetch response:', JSON.stringify(directData, null, 2));
+        
+        if (directResponse.ok) {
+          setGames(directData.games || directData || []);
+        } else {
+          console.error('❌ Direct fetch failed:', directResponse.status, directData);
+          setGames([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch games:', error);
+        // If it's an auth error, the API client will handle token refresh automatically
+      } finally {
+        setGamesLoading(false);
       }
-    }
-  };
+    };
+
+    fetchGames();
+  }, []);
 
   const handleInputChange = (field, value) => {
     setPostData(prev => ({
       ...prev,
       [field]: value
+    }));
+  };
+
+  const handleGamesSelection = (selectedGameIds, selectedGamesInfo) => {
+    // Create display string from game titles
+    const displayString = selectedGamesInfo.map(game => game.title).join(', ');
+    
+    setPostData(prev => ({
+      ...prev,
+      suggestedGames: displayString,
+      selectedGameIds: selectedGameIds
+    }));
+  };
+
+  const toggleGameSelection = (game) => {
+    const currentIds = postData.selectedGameIds || [];
+    const isSelected = currentIds.includes(game.id);
+    
+    let newIds;
+    if (isSelected) {
+      newIds = currentIds.filter(id => id !== game.id);
+    } else {
+      newIds = [...currentIds, game.id];
+    }
+    
+    // Get selected games info for display
+    const selectedGamesInfo = games.filter(g => newIds.includes(g.id));
+    const displayString = selectedGamesInfo.map(g => g.title).join(', ');
+    
+    setPostData(prev => ({
+      ...prev,
+      selectedGameIds: newIds,
+      suggestedGames: displayString
     }));
   };
 
@@ -199,6 +266,16 @@ export default function CreatePostScreen({ navigation }) {
       'Thumper, Rez Infinite, Amplitude'
     ];
     
+    // Sample game IDs (using the actual IDs from your API response)
+    const sampleGameIds = [
+      ['c2607b23-986a-4c9a-b7c1-f629a44a8454'], // Temple Run
+      ['2d6263d7-d4a4-4074-8be3-430120ac1cc5'], // Flappy Bird
+      ['c2607b23-986a-4c9a-b7c1-f629a44a8454', '2d6263d7-d4a4-4074-8be3-430120ac1cc5'], // Both games
+      ['c2607b23-986a-4c9a-b7c1-f629a44a8454'], // Temple Run again
+      ['2d6263d7-d4a4-4074-8be3-430120ac1cc5'], // Flappy Bird again
+      []  // No games selected
+    ];
+    
     const randomIndex = Math.floor(Math.random() * sampleNames.length);
     
     setPostData({
@@ -206,7 +283,8 @@ export default function CreatePostScreen({ navigation }) {
       caption: sampleCaptions[randomIndex],
       notes: sampleNotes[randomIndex],
       tempo: 120 + Math.floor(Math.random() * 60), // Random tempo between 120-180
-      suggestedGames: sampleGames[randomIndex]
+      suggestedGames: sampleGames[randomIndex],
+      selectedGameIds: sampleGameIds[randomIndex]
     });
     
     Alert.alert('Sample Data Added', 'Sample data has been filled in. You can modify it as needed.');
@@ -248,11 +326,15 @@ export default function CreatePostScreen({ navigation }) {
         return;
       }
 
-      // Get the auth token - use the updated test token if no stored token
-      let authToken = await AsyncStorage.getItem('access_token');
+      // Get the auth token from storage
+      const authToken = await AsyncStorage.getItem('access_token');
       if (!authToken) {
-        authToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4NTk3YTZkMi04OGUxLTQ3OGUtYTZmNS00NGRiYWQ0ODBmMzEiLCJleHAiOjE3NTY3MTk1NTUsInR5cGUiOiJhY2Nlc3MifQ.zXOXD3QzeQ0VSmOqnVpqZ5mWtYnG6N7fdImZxGeAe_0';
-        console.log('Using test auth token');
+        Alert.alert(
+          'Authentication Required',
+          'Please sign in to upload content.',
+          [{ text: 'OK' }]
+        );
+        return;
       }
 
       // Step 1: Get S3 Upload URL
@@ -544,7 +626,8 @@ export default function CreatePostScreen({ navigation }) {
         tempo: postData.tempo || 120,
         is_public: true,
         access_type: 'free',
-        tags: []
+        tags: [],
+        game_ids: postData.selectedGameIds || []
       };
 
       // Create API URL with s3_key as query parameter
@@ -641,6 +724,50 @@ export default function CreatePostScreen({ navigation }) {
     </TouchableOpacity>
   );
 
+  const renderGameCard = ({ item }) => {
+    const isSelected = (postData.selectedGameIds || []).includes(item.id);
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.gameCard,
+          {
+            backgroundColor: isSelected ? `${theme.primary}20` : theme.surface,
+            borderColor: isSelected ? theme.primary : theme.border,
+          }
+        ]}
+        onPress={() => toggleGameSelection(item)}
+      >
+        <View style={styles.gameCardContent}>
+          <View style={styles.gameIcon}>
+            <Text style={styles.gameIconText}>🎮</Text>
+          </View>
+          <Text style={[styles.gameCardTitle, { color: theme.text }]} numberOfLines={1}>
+            {item.title}
+          </Text>
+          {item.description && (
+            <Text style={[styles.gameCardDescription, { color: theme.textSecondary }]} numberOfLines={2}>
+              {item.description}
+            </Text>
+          )}
+          
+          {/* Checkbox inside the card */}
+          <View style={[
+            styles.gameCardCheckbox,
+            {
+              backgroundColor: isSelected ? theme.primary : 'transparent',
+              borderColor: isSelected ? theme.primary : theme.border
+            }
+          ]}>
+            {isSelected && (
+              <Text style={styles.gameCardCheckmark}>✓</Text>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       {/* Header */}
@@ -720,12 +847,6 @@ export default function CreatePostScreen({ navigation }) {
               numberOfLines={4}
               textAlignVertical="top"
             />
-            <TouchableOpacity
-              style={[styles.uploadNotesButtonBelow, { backgroundColor: theme.primary }]}
-              onPress={handleNotesFileUpload}
-            >
-              <Text style={[styles.uploadButtonText, { color: 'white' }]}>📄 Select File</Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -755,22 +876,50 @@ export default function CreatePostScreen({ navigation }) {
               style={styles.infoButton}
               onPress={() => Alert.alert(
                 'Suggested Games',
-                'If user has chosen game/games, those will be suggested for the user to play along with your music content.',
+                'If you’ve chosen game(s), they’ll be suggested for the viewers to play along with the music content.',
                 [{ text: 'OK' }]
               )}
             >
               <Text style={[styles.infoButtonText, { color: theme.textTertiary }]}>ℹ️</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={[styles.textInput, { backgroundColor: theme.background, borderColor: theme.border, color: theme.text }]}
-              value={postData.suggestedGames}
-              onChangeText={(value) => handleInputChange('suggestedGames', value)}
-              placeholder="e.g: Piano Tiles, Guitar Hero, Beat Saber"
-              placeholderTextColor={theme.textTertiary}
-            />
-          </View>
+          
+          {gamesLoading ? (
+            <View style={styles.gamesLoadingContainer}>
+              <ActivityIndicator size="small" color={theme.primary} />
+              <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading games...</Text>
+            </View>
+          ) : (
+            <View style={styles.gamesContainer}>
+              <FlatList
+                data={[...games.slice(0, 6), { id: 'view_more', isViewMore: true }]}
+                renderItem={({ item }) => {
+                  if (item.isViewMore) {
+                    return (
+                      <TouchableOpacity
+                        style={[styles.viewMoreCard, { backgroundColor: theme.background, borderColor: theme.border }]}
+                        onPress={() => setShowGamesPickerModal(true)}
+                      >
+                        <View style={styles.viewMoreCardContent}>
+                          <View style={[styles.viewMoreIcon, { backgroundColor: theme.surface }]}>
+                            <Text style={[styles.viewMoreIconText, { color: theme.textSecondary }]}>→</Text>
+                          </View>
+                          <Text style={[styles.viewMoreCardText, { color: theme.textSecondary }]}>View More</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }
+                  return renderGameCard({ item });
+                }}
+                keyExtractor={(item) => item.id}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.gamesScrollContainer}
+                ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+              />
+              
+            </View>
+          )}
         </View>
 
         {/* Post Details Form */}
@@ -868,6 +1017,14 @@ export default function CreatePostScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* Games Picker Modal */}
+      <GamesPickerModal
+        visible={showGamesPickerModal}
+        onClose={() => setShowGamesPickerModal(false)}
+        onSelectGames={handleGamesSelection}
+        selectedGameIds={postData.selectedGameIds}
+      />
     </SafeAreaView>
   );
 }
@@ -1180,5 +1337,151 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     position: 'absolute',
     marginLeft: -10,
+  },
+  // Games Picker Styles
+  gamesInputContainer: {
+    gap: 12,
+  },
+  gamesTextInput: {
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  chooseGamesButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignSelf: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  chooseGamesButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  // New Game Card Styles
+  gamesContainer: {
+    marginTop: 8,
+  },
+  gamesScrollContainer: {
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+  },
+  gamesLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+  },
+  gameCard: {
+    width: 140,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 12,
+    alignItems: 'center',
+  },
+  gameCardContent: {
+    alignItems: 'center',
+    position: 'relative',
+    width: '100%',
+  },
+  gameIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(108, 99, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  gameIconText: {
+    fontSize: 20,
+  },
+  gameCardTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 4,
+    minHeight: 18,
+  },
+  gameCardDescription: {
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 14,
+    marginBottom: 8,
+    minHeight: 28,
+  },
+  gameCardCheckbox: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gameCardCheckmark: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  viewMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 12,
+    gap: 8,
+  },
+  viewMoreText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  viewMoreIcon: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  // View More Card (inline with game cards)
+  viewMoreCard: {
+    width: 140,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderStyle: 'dashed',
+  },
+  viewMoreCardContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 100, // Match approximate height of game cards
+  },
+  viewMoreIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  viewMoreIconText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  viewMoreCardText: {
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

@@ -6004,6 +6004,11 @@ react-native-screens@^3.34.0, "react-native-screens@>= 3.0.0":
     react-freeze "^1.0.0"
     warn-once "^0.1.0"
 
+react-native-video@^6.16.1:
+  version "6.16.1"
+  resolved "https://registry.npmjs.org/react-native-video/-/react-native-video-6.16.1.tgz"
+  integrity sha512-+G6tVVGbwFqNTyPivqb+PhQzWr5OudDQ1dgvBNyBRAgcS8rOcbwuS6oX+m8cxOsXHn1UT9ofQnjQEwkGOsvomg==
+
 react-native@*, "react-native@^0.0.0-0 || >=0.65 <1.0", react-native@0.75.4:
   version "0.75.4"
   resolved "https://registry.npmjs.org/react-native/-/react-native-0.75.4.tgz"

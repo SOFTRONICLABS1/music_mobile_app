@@ -6,6 +6,7 @@ import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import authService from '../src/api/services/authService';
+import ProfileTabs from '../components/ProfileTabs';
 
 const dummyUserData = {
   userSince: 'March 2023',
@@ -115,6 +116,7 @@ export default function ProfileScreen({ navigation }) {
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [showContentCreation, setShowContentCreation] = useState(false);
+  const [activeTab, setActiveTab] = useState('posts');
 
   useEffect(() => {
     fetchUserProfile();
@@ -296,6 +298,16 @@ export default function ProfileScreen({ navigation }) {
     Alert.alert('Game Launch', `Starting ${gameName}...`);
   };
 
+  const handleGamePress = (game) => {
+    console.log('Recent game selected:', game);
+    // Navigate to game or show more details
+    Alert.alert('Game Selected', `You selected ${game.title}. Score: ${game.score} pts`);
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+  };
+
   const handleContentCreation = (type) => {
     setShowContentCreation(false);
     switch (type) {
@@ -305,6 +317,25 @@ export default function ProfileScreen({ navigation }) {
       default:
         break;
     }
+  };
+
+  const handleCreateFromTabs = (activeTab) => {
+    if (activeTab === 'posts') {
+      setShowContentCreation(true);
+    } else if (activeTab === 'playlists') {
+      // TODO: Navigate to create playlist screen or show create playlist modal
+      Alert.alert('Create Playlist', 'Create playlist functionality will be implemented here');
+    }
+  };
+
+  const handlePostPress = (post, allPosts) => {
+    navigation.navigate('UserHome', { 
+      userId: 'current_user',
+      userName: userData?.username || 'musiccreator',
+      userDisplayName: userData?.signup_username || userData?.username || 'Music Creator',
+      userAvatar: userData?.avatar_url || null,
+      contentId: post.id
+    });
   };
 
   if (isLoading) {
@@ -330,7 +361,7 @@ export default function ProfileScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* Header with hamburger menu */}
         <View style={[styles.header, { backgroundColor: theme.surface }]}>
           <View style={{ width: 40 }} />
@@ -343,170 +374,99 @@ export default function ProfileScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Profile Section */}
-        <View style={[styles.profileSection, { backgroundColor: theme.surface }]}>
-          <View style={styles.profileHeader}>
-            <TouchableOpacity style={styles.avatarContainer} onPress={handleImageUpload}>
-              {userData.profile_image_url ? (
-                <Image 
-                  source={{ uri: userData.profile_image_url }} 
-                  style={styles.avatarImage}
-                />
-              ) : (
-                <View style={[styles.avatarPlaceholder, { backgroundColor: theme.surfacePlus || theme.border }]}>
-                  <IconSymbol name="person.fill" size={40} color={theme.textSecondary} />
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <View style={styles.profileInfo}>
-              <View style={styles.nameRow}>
-                <Text style={[styles.fullName, { color: theme.text }]}>{userData.signup_username || userData.username}</Text>
-              </View>
-              <Text style={[styles.email, { color: theme.textSecondary }]}>@{userData.username}</Text>
-              
-              {/* Edit Profile Button */}
-              <View style={styles.buttonContainer}>
-                <TouchableOpacity 
-                  style={[styles.editProfileButton, { backgroundColor: theme.surface, borderColor: theme.border }]} 
-                  onPress={() => navigation.navigate('EditProfile')}
-                >
-                  <Text style={[styles.editProfileButtonText, { color: theme.text }]}>Edit Profile</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          <Text style={[styles.bio, { color: theme.textSecondary }]}>
-            {userData.bio || 'No bio added yet'}
-          </Text>
-
-          {/* Social Stats */}
-          <View style={[styles.statsContainer, { borderTopColor: theme.border }]}>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: theme.text }]}>{userData.followers.toLocaleString()}</Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Followers</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: theme.text }]}>{userData.following.toLocaleString()}</Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Following</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: theme.text }]}>{userData.totalPlaylists}</Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Playlists</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: theme.text }]}>{(userData.totalPlays / 1000).toFixed(0)}K</Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Total Plays</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Recent Games Section */}
-        <View style={styles.recentGamesSection}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Games</Text>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.gamesScroll}>
-            {userData.recentGames.map((game) => (
-              <TouchableOpacity 
-                key={game.id}
-                style={[styles.gameReelCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
-                onPress={() => handlePlayGame(game.gameName)}
-              >
-                <View style={styles.gameIconContainer}>
-                  <View style={[styles.gameIcon, { backgroundColor: theme.surfacePlus || theme.border }]}>
-                    <IconSymbol name="gamecontroller.fill" size={20} color={theme.primary} />
+        <ScrollView 
+          style={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+          contentContainerStyle={styles.scrollContent}
+          nestedScrollEnabled={false}
+        >
+          {/* Profile Section */}
+          <View style={[styles.profileSection, { backgroundColor: theme.surface }]}>
+            <View style={styles.profileHeader}>
+              <TouchableOpacity style={styles.avatarContainer} onPress={handleImageUpload}>
+                {userData.profile_image_url ? (
+                  <Image 
+                    source={{ uri: userData.profile_image_url }} 
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <View style={[styles.avatarPlaceholder, { backgroundColor: theme.surfacePlus || theme.border }]}>
+                    <IconSymbol name="person.fill" size={40} color={theme.textSecondary} />
                   </View>
-                  
-                  {/* Difficulty Badge */}
-                  <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(game.difficulty) }]}>
-                    <Text style={styles.difficultyText}>{game.difficulty}</Text>
-                  </View>
-                  
-                  {/* Rank Badge */}
-                  <View style={[styles.rankBadge, { backgroundColor: theme.primary }]}>
-                    <Text style={styles.rankText}>#{game.rank}</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.gameInfo}>
-                  <Text style={[styles.gameTitle, { color: theme.text }]} numberOfLines={2}>
-                    {game.gameName}
-                  </Text>
-                  <Text style={[styles.gameScore, { color: theme.primary }]}>{game.score.toLocaleString()}</Text>
-                  <View style={styles.gameStats}>
-                    <View style={styles.gameStat}>
-                      <IconSymbol name="clock.fill" size={12} color={theme.textSecondary} />
-                      <Text style={[styles.gameStatText, { color: theme.textSecondary }]}>
-                        {game.duration}
-                      </Text>
-                    </View>
-                    <View style={styles.gameStat}>
-                      <Text style={[styles.gameStatText, { color: theme.textTertiary || theme.textSecondary }]}>
-                        {game.date}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
+                )}
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
 
-        {/* My Playlists Section */}
-        <View style={styles.playlistsSection}>
-          <View style={styles.playlistsHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>My Playlists</Text>
-            <TouchableOpacity 
-              style={[styles.createContentButton, { backgroundColor: theme.primary }]}
-              onPress={() => setShowContentCreation(true)}
-            >
-              <Text style={[styles.plusIcon, { color: 'white' }]}>+</Text>
-            </TouchableOpacity>
-          </View>
-          
-          {userData.playlists.map((playlist) => (
-            <TouchableOpacity 
-              key={playlist.id}
-              style={[styles.playlistCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
-              onPress={() => handlePlaylistPress(playlist)}
-            >
-              <View style={styles.playlistCardContent}>
-                <View style={styles.playlistImageContainer}>
-                  {playlist.thumbnail ? (
-                    <Image source={{ uri: playlist.thumbnail }} style={styles.playlistThumbnail} />
-                  ) : (
-                    <View style={[styles.playlistThumbnailPlaceholder, { backgroundColor: theme.surfacePlus || theme.border }]}>
-                      <IconSymbol name="music.note" size={24} color={theme.primary} />
-                    </View>
-                  )}
-                  <View style={[styles.playOverlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
-                    <IconSymbol name="play.circle.fill" size={20} color="white" />
-                  </View>
+              <View style={styles.profileInfo}>
+                <View style={styles.nameRow}>
+                  <Text style={[styles.fullName, { color: theme.text }]}>{userData.signup_username || userData.username}</Text>
                 </View>
+                <Text style={[styles.email, { color: theme.textSecondary }]}>@{userData.username}</Text>
                 
-                <View style={styles.playlistInfo}>
-                  <Text style={[styles.playlistName, { color: theme.text }]} numberOfLines={2}>
-                    {playlist.name}
-                  </Text>
-                  <Text style={[styles.playlistDescription, { color: theme.textSecondary }]} numberOfLines={1}>
-                    {playlist.description}
-                  </Text>
-                  <Text style={[styles.playlistTrackCount, { color: theme.textTertiary || theme.textSecondary }]}>
-                    {playlist.trackCount} tracks
-                  </Text>
+                {/* Edit Profile Button */}
+                <View style={styles.buttonContainer}>
+                  <TouchableOpacity 
+                    style={[styles.editProfileButton, { backgroundColor: theme.surface, borderColor: theme.border }]} 
+                    onPress={() => navigation.navigate('EditProfile')}
+                  >
+                    <Text style={[styles.editProfileButtonText, { color: theme.text }]}>Edit Profile</Text>
+                  </TouchableOpacity>
                 </View>
-
-                <TouchableOpacity style={styles.playlistMenuButton}>
-                  <IconSymbol name="ellipsis" size={16} color={theme.textTertiary || theme.textSecondary} />
-                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+            </View>
 
-        <Modal
-          visible={showMenu}
+            <Text style={[styles.bio, { color: theme.textSecondary }]}>
+              {userData.bio || 'No bio added yet'}
+            </Text>
+
+            {/* Social Stats */}
+            <View style={[styles.statsContainer, { borderTopColor: theme.border, borderBottomColor: theme.border }]}>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: theme.text }]}>{userData.followers.toLocaleString()}</Text>
+                <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Followers</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: theme.text }]}>{userData.following.toLocaleString()}</Text>
+                <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Following</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: theme.text }]}>{userData.totalPlaylists}</Text>
+                <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Playlists</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: theme.text }]}>{(userData.totalPlays / 1000).toFixed(0)}K</Text>
+                <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Total Plays</Text>
+              </View>
+            </View>
+
+
+            {/* Posts and Playlists Tabs - Right below separator */}
+            <View style={styles.tabsInline}>
+              <ProfileTabs 
+                playlists={userData.playlists}
+                onCreatePress={handleCreateFromTabs}
+                onPostPress={handlePostPress}
+                onPlaylistPress={handlePlaylistPress}
+                onGamePress={handleGamePress}
+                onTabChange={handleTabChange}
+              />
+            </View>
+          </View>
+        </ScrollView>
+      </View>
+
+      {/* Floating Action Button - Hide for games tab */}
+      {activeTab !== 'games' && (
+        <TouchableOpacity
+          style={[styles.floatingActionButton, { backgroundColor: theme.primary }]}
+          onPress={() => handleCreateFromTabs(activeTab)}
+        >
+          <Text style={styles.floatingActionIcon}>+</Text>
+        </TouchableOpacity>
+      )}
+
+      <Modal
+        visible={showMenu}
           transparent={true}
           animationType="fade"
           onRequestClose={() => setShowMenu(false)}
@@ -578,8 +538,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </Modal>
-      </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
   );
 }
 
@@ -589,6 +548,12 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 20, // Add padding to ensure content isn't hidden
   },
   header: {
     flexDirection: 'row',
@@ -673,7 +638,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingTop: 16,
+    paddingBottom: 16,
     borderTopWidth: 1,
+    borderBottomWidth: 1,
   },
   statItem: {
     alignItems: 'center',
@@ -686,91 +653,10 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 12,
   },
-  recentGamesSection: {
-    padding: 20,
-    paddingBottom: 12,
-  },
-  gamesScroll: {
-    paddingRight: 20,
-  },
-  gameReelCard: {
-    width: 140,
-    borderRadius: 10,
-    padding: 10,
-    marginRight: 10,
-    borderWidth: 1,
-  },
-  gameIconContainer: {
-    position: 'relative',
-    marginBottom: 6,
-  },
-  gameIcon: {
-    width: '100%',
-    height: 80,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  difficultyBadge: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  difficultyText: {
-    color: 'white',
-    fontSize: 9,
-    fontWeight: 'bold',
-  },
-  rankBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  rankText: {
-    color: 'white',
-    fontSize: 9,
-    fontWeight: 'bold',
-  },
-  gameInfo: {
-    minHeight: 60,
-  },
-  gameTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  gameScore: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  gameStats: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  gameStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  gameStatText: {
-    fontSize: 10,
-  },
-  playlistsSection: {
-    padding: 20,
-  },
-  playlistsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+  tabsInline: {
+    marginTop: 0,
+    paddingTop: 0,
+    flex: 1,
   },
   sectionTitle: {
     fontSize: 18,
@@ -944,5 +830,31 @@ const styles = StyleSheet.create({
   contentOptionDescription: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  // Floating Action Button Styles
+  floatingActionButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    width: 45,
+    height: 45,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    zIndex: 1000,
+  },
+  floatingActionIcon: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+    lineHeight: 28,
   },
 });
