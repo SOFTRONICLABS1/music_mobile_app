@@ -1,6 +1,6 @@
 import React from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
-import { GamesList } from '../components/games/GamesList';
+import { PublicContentFeed } from '../components/games/PublicContentFeed';
 import { useTheme } from '../theme/ThemeContext';
 
 export default function HomeScreen({ navigation }) {
@@ -8,7 +8,7 @@ export default function HomeScreen({ navigation }) {
   
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <GamesList navigation={navigation} />
+      <PublicContentFeed navigation={navigation} />
     </SafeAreaView>
   );
 }

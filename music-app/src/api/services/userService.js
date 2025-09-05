@@ -72,6 +72,33 @@ class UserService {
       throw error;
     }
   }
+  
+  /**
+   * Get user by ID
+   * @param {string} userId - User ID
+   * @returns {Promise} User data
+   */
+  async getUserById(userId) {
+    try {
+      console.log(`👤 Fetching user data for ID: ${userId}`);
+      
+      const response = await apiClient.get(`/auth/user/${userId}`);
+      
+      console.log('=== GET USER BY ID API RESPONSE ===');
+      console.log(JSON.stringify(response.data, null, 2));
+      console.log('===================================');
+      
+      return response.data;
+    } catch (error) {
+      console.error('=== GET USER BY ID API ERROR ===');
+      console.error('Status:', error.response?.status);
+      console.error('Error Data:', error.response?.data);
+      console.error('User ID:', userId);
+      console.error('===============================');
+      
+      throw error;
+    }
+  }
 }
 
 export default new UserService();

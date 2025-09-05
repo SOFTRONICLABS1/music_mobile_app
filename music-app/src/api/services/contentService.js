@@ -68,6 +68,39 @@ class ContentService {
       throw error;
     }
   }
+  
+  /**
+   * Get public content with pagination
+   * @param {number} page - Page number (default: 1)
+   * @param {number} perPage - Items per page (default: 20)
+   * @returns {Promise} Public content with pagination info
+   */
+  async getPublicContent(page = 1, perPage = 20) {
+    try {
+      console.log('📱 Fetching public content...');
+      console.log(`📄 Page: ${page}, Per Page: ${perPage}`);
+      
+      const response = await apiClient.get('/content/public', {
+        params: {
+          page,
+          per_page: perPage
+        }
+      });
+      
+      console.log('=== PUBLIC CONTENT API RESPONSE ===');
+      console.log(JSON.stringify(response.data, null, 2));
+      console.log('===================================');
+      
+      return response.data;
+    } catch (error) {
+      console.error('=== PUBLIC CONTENT API ERROR ===');
+      console.error('Status:', error.response?.status);
+      console.error('Error Data:', error.response?.data);
+      console.error('===============================');
+      
+      throw error;
+    }
+  }
 }
 
 export default new ContentService();
