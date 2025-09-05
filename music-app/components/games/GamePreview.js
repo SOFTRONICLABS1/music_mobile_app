@@ -251,7 +251,14 @@ export const GamePreview = ({ musicVideoReel, navigation, showFollowButton = tru
 
   const handleUserPress = () => {
     // Navigate to User Profile screen
+    console.log('🧭 Navigating to user profile:', {
+      userId: musicVideoReel.userId || musicVideoReel.user.id,
+      username: musicVideoReel.user.name,
+      displayName: musicVideoReel.user.displayName
+    });
+    
     navigation.navigate('UserProfile', {
+      userId: musicVideoReel.userId || musicVideoReel.user.id,
       username: musicVideoReel.user.name
     });
   };

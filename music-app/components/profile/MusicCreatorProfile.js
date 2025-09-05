@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Image, ScrollView, SafeAreaView, Modal, Alert } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Image, ScrollView, SafeAreaView, Modal, Alert, Dimensions, FlatList } from 'react-native';
 import { IconSymbol } from '../ui/IconSymbol';
 import { useTheme } from '../../theme/ThemeContext';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 export default function MusicCreatorProfile({ 
   creatorName, 
@@ -11,6 +13,7 @@ export default function MusicCreatorProfile({
   bio,
   featuredTracks = [],
   playlists = [],
+  userPosts = [],
   onFollowToggle,
   onMessage,
   navigation
@@ -19,9 +22,11 @@ export default function MusicCreatorProfile({
   const [isFollowing, setIsFollowing] = useState(false);
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('posts');
 
   const safePlaylist = playlists || [];
   const safeFeaturedTracks = featuredTracks || [];
+  const itemWidth = (screenWidth - 80) / 3; // 3 columns with buffer - same as ProfileTabs
   
   const userData = {
     username: creatorName || 'Unknown User',
@@ -67,6 +72,54 @@ export default function MusicCreatorProfile({
 
   const handleBackPress = () => {
     navigation.goBack();
+  };
+
+  const handleTabChange = (tabName) => {
+    setActiveTab(tabName);
+  };
+
+  const renderPost = ({ item, index }) => {
+    const isVideo = item.mediaType === 'video';
+    const playCount = item.plays || 0;
+    
+    return (
+      <TouchableOpacity
+        style={[styles.gridItem, { width: itemWidth, height: itemWidth }]}
+        onPress={() => {
+          console.log('Open post:', item.id);
+        }}
+      >
+        <View style={[styles.postThumbnail]}>
+          <Image 
+            source={{ uri: item.thumbnailUrl || `https://picsum.photos/300/300?random=${index}` }} 
+            style={styles.thumbnailImage}
+            resizeMode="cover"
+          />
+          
+          {/* Large content type overlay */}
+          <View style={styles.contentTypeOverlay}>
+            <Text style={styles.contentTypeIcon}>
+              {isVideo ? '🎬' : '🎵'}
+            </Text>
+          </View>
+        </View>
+        
+        {/* Content Type Indicator */}
+        <View style={styles.typeIndicator}>
+          <Text style={styles.typeIndicatorText}>
+            {isVideo ? '▶' : '♪'}
+          </Text>
+        </View>
+
+        {/* Play Count Indicator */}
+        <View style={styles.playCountIndicator}>
+          <Text style={styles.playIconText}>▶</Text>
+          <Text style={styles.playCountText}>
+            {playCount > 1000 ? `${(playCount/1000).toFixed(1)}K` : playCount}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -160,98 +213,129 @@ export default function MusicCreatorProfile({
           </View>
         </View>
 
-        {/* Featured Tracks Section */}
-        <View style={styles.featuredSection}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Featured</Text>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tracksScroll}>
-            {userData.featuredTracks && userData.featuredTracks.length > 0 ? userData.featuredTracks.map((track) => (
-              <TouchableOpacity 
-                key={track.id}
-                style={[styles.trackCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
-                onPress={() => handlePlayFeaturedTrack(track.title)}
-              >
-                <View style={styles.trackIconContainer}>
-                  <View style={[styles.trackIcon, { backgroundColor: theme.surfacePlus }]}>
-                    <IconSymbol name="music.note" size={20} color={theme.primary} />
-                  </View>
-                  
-                  {/* Play Button */}
-                  <View style={[styles.playBadge, { backgroundColor: theme.primary }]}>
-                    <IconSymbol name="play.fill" size={12} color="white" />
-                  </View>
-                </View>
-                
-                <View style={styles.trackInfo}>
-                  <Text style={[styles.trackTitle, { color: theme.text }]} numberOfLines={2}>
-                    {track.title}
-                  </Text>
-                  <Text style={[styles.trackPlays, { color: theme.primary }]}>{track.plays.toLocaleString()}</Text>
-                  <View style={styles.trackStats}>
-                    <View style={styles.trackStat}>
-                      <IconSymbol name="clock.fill" size={12} color={theme.textSecondary} />
-                      <Text style={[styles.trackStatText, { color: theme.textSecondary }]}>
-                        {track.duration}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            )) : (
-              <View style={styles.emptyState}>
-                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No featured tracks yet</Text>
+        {/* Tab Navigation */}
+        <View style={[styles.tabNavigation, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'posts' && styles.activeTab]}
+            onPress={() => handleTabChange('posts')}
+          >
+            <View style={styles.tabContent}>
+              <View style={styles.tabRow}>
+                <Text style={[
+                  styles.tabIcon, 
+                  { color: activeTab === 'posts' ? theme.text : theme.textSecondary }
+                ]}>
+                  ⊞
+                </Text>
+                <Text style={[
+                  styles.tabText, 
+                  { color: activeTab === 'posts' ? theme.text : theme.textSecondary }
+                ]}>
+                  Posts
+                </Text>
               </View>
-            )}
-          </ScrollView>
+              {activeTab === 'posts' && (
+                <View style={[styles.tabUnderline, { backgroundColor: theme.primary }]} />
+              )}
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'playlists' && styles.activeTab]}
+            onPress={() => handleTabChange('playlists')}
+          >
+            <View style={styles.tabContent}>
+              <View style={styles.tabRow}>
+                <Text style={[
+                  styles.tabIcon, 
+                  { color: activeTab === 'playlists' ? theme.text : theme.textSecondary }
+                ]}>
+                  ♫
+                </Text>
+                <Text style={[
+                  styles.tabText, 
+                  { color: activeTab === 'playlists' ? theme.text : theme.textSecondary }
+                ]}>
+                  Playlists
+                </Text>
+              </View>
+              {activeTab === 'playlists' && (
+                <View style={[styles.tabUnderline, { backgroundColor: theme.primary }]} />
+              )}
+            </View>
+          </TouchableOpacity>
         </View>
 
-        {/* Playlists Section */}
-        <View style={styles.playlistsSection}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Playlists</Text>
-          
-          {userData.playlists && userData.playlists.length > 0 ? userData.playlists.map((playlist) => (
-            <TouchableOpacity 
-              key={playlist.id}
-              style={[styles.playlistCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
-              onPress={() => handlePlaylistPress(playlist)}
-            >
-              <View style={styles.playlistCardContent}>
-                <View style={styles.playlistImageContainer}>
-                  {playlist.thumbnail ? (
-                    <Image source={{ uri: playlist.thumbnail }} style={styles.playlistThumbnail} />
-                  ) : (
-                    <View style={[styles.playlistThumbnailPlaceholder, { backgroundColor: theme.surfacePlus }]}>
-                      <IconSymbol name="music.note" size={24} color={theme.primary} />
+        {/* Tab Content */}
+        <View style={styles.tabContentContainer}>
+          {activeTab === 'posts' ? (
+            <View style={styles.listContainer}>
+              {userPosts && userPosts.length > 0 ? (
+                <FlatList
+                  data={userPosts}
+                  renderItem={renderPost}
+                  numColumns={3}
+                  keyExtractor={(item, index) => item.id || index.toString()}
+                  contentContainerStyle={styles.row}
+                  scrollEnabled={false}
+                  showsVerticalScrollIndicator={false}
+                />
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyIcon}>⊞</Text>
+                  <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No posts yet</Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.listContainer}>
+              {userData.playlists && userData.playlists.length > 0 ? userData.playlists.map((playlist) => (
+                <TouchableOpacity 
+                  key={playlist.id}
+                  style={[styles.playlistCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                  onPress={() => handlePlaylistPress(playlist)}
+                >
+                  <View style={styles.playlistCardContent}>
+                    <View style={styles.playlistImageContainer}>
+                      {playlist.thumbnail ? (
+                        <Image source={{ uri: playlist.thumbnail }} style={styles.playlistThumbnail} />
+                      ) : (
+                        <View style={[styles.playlistThumbnailPlaceholder, { backgroundColor: theme.surfacePlus }]}>
+                          <IconSymbol name="music.note" size={24} color={theme.primary} />
+                        </View>
+                      )}
+                      <View style={[styles.playOverlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+                        <IconSymbol name="play.circle.fill" size={20} color="white" />
+                      </View>
                     </View>
-                  )}
-                  <View style={[styles.playOverlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
-                    <IconSymbol name="play.circle.fill" size={20} color="white" />
-                  </View>
-                </View>
-                
-                <View style={styles.playlistInfo}>
-                  <Text style={[styles.playlistName, { color: theme.text }]} numberOfLines={2}>
-                    {playlist.title}
-                  </Text>
-                  <Text style={[styles.playlistDescription, { color: theme.textSecondary }]} numberOfLines={1}>
-                    {playlist.description}
-                  </Text>
-                  <Text style={[styles.playlistTrackCount, { color: theme.textTertiary }]}>
-                    {playlist.trackCount} tracks
-                  </Text>
-                </View>
+                    
+                    <View style={styles.playlistInfo}>
+                      <Text style={[styles.playlistName, { color: theme.text }]} numberOfLines={2}>
+                        {playlist.title}
+                      </Text>
+                      <Text style={[styles.playlistDescription, { color: theme.textSecondary }]} numberOfLines={1}>
+                        {playlist.description}
+                      </Text>
+                      <Text style={[styles.playlistTrackCount, { color: theme.textTertiary }]}>
+                        {playlist.trackCount} tracks
+                      </Text>
+                    </View>
 
-                <TouchableOpacity style={styles.playlistMenuButton}>
-                  <IconSymbol name="ellipsis" size={16} color={theme.textTertiary} />
+                    <TouchableOpacity style={styles.playlistMenuButton}>
+                      <IconSymbol name="ellipsis" size={16} color={theme.textTertiary} />
+                    </TouchableOpacity>
+                  </View>
                 </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          )) : (
-            <View style={styles.emptyState}>
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No playlists yet</Text>
+              )) : (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyIcon}>♫</Text>
+                  <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No playlists yet</Text>
+                </View>
+              )}
             </View>
           )}
         </View>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -500,10 +584,139 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+    opacity: 0.5,
   },
   emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  // Tab Navigation Styles
+  tabNavigation: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    marginTop: 20,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  tabContent: {
+    alignItems: 'center',
+    position: 'relative',
+  },
+  tabRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tabIcon: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  tabText: {
     fontSize: 14,
-    fontStyle: 'italic',
+    fontWeight: '600',
+  },
+  tabUnderline: {
+    position: 'absolute',
+    bottom: -12,
+    left: 0,
+    right: 0,
+    height: 2,
+  },
+  // Tab Content Styles - Matching ProfileTabs exactly
+  tabContentContainer: {
+    flex: 1,
+    minHeight: 300,
+  },
+  listContainer: {
+    padding: 16,
+    paddingTop: 8,
+  },
+  row: {
+    justifyContent: 'flex-start',
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  gridItem: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+    marginHorizontal: 5,
+  },
+  postThumbnail: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  contentTypeOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contentTypeIcon: {
+    fontSize: 32,
+    opacity: 0.8,
+  },
+  typeIndicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  typeIndicatorText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  playCountIndicator: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  playIconText: {
+    color: 'white',
+    fontSize: 8,
+    fontWeight: '600',
+  },
+  playCountText: {
+    color: 'white',
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
   },
 });

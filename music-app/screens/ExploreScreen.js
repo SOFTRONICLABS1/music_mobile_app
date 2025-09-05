@@ -187,7 +187,18 @@ export default function ExploreScreen({ navigation }) {
     return (
       <TouchableOpacity 
         style={styles.accountItem}
-        onPress={() => console.log('Navigate to account:', item.username)}
+        onPress={() => {
+          console.log('🧭 Navigating to user profile from search:', {
+            userId: item.id,
+            username: item.username,
+            displayName: displayName
+          });
+          
+          navigation.navigate('UserProfile', {
+            userId: item.id,
+            username: item.username
+          });
+        }}
       >
         <Image source={{ uri: avatarUrl }} style={styles.accountAvatar} />
         <View style={styles.accountInfo}>

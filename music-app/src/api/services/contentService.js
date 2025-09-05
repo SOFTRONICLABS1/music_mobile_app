@@ -101,6 +101,41 @@ class ContentService {
       throw error;
     }
   }
+  
+  /**
+   * Get content for a specific user
+   * @param {string} userId - User ID
+   * @param {number} page - Page number (default: 1)
+   * @param {number} perPage - Items per page (default: 20)
+   * @returns {Promise} User's content with pagination info
+   */
+  async getUserContent(userId, page = 1, perPage = 20) {
+    try {
+      console.log(`📱 Fetching content for user ${userId}...`);
+      console.log(`📄 Page: ${page}, Per Page: ${perPage}`);
+      
+      const response = await apiClient.get(`/content/user/${userId}`, {
+        params: {
+          page,
+          per_page: perPage
+        }
+      });
+      
+      console.log('=== USER CONTENT API RESPONSE ===');
+      console.log(JSON.stringify(response.data, null, 2));
+      console.log('==================================');
+      
+      return response.data;
+    } catch (error) {
+      console.error('=== USER CONTENT API ERROR ===');
+      console.error('Status:', error.response?.status);
+      console.error('Error Data:', error.response?.data);
+      console.error('User ID:', userId);
+      console.error('==============================');
+      
+      throw error;
+    }
+  }
 }
 
 export default new ContentService();

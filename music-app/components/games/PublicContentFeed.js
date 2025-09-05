@@ -39,10 +39,12 @@ const transformPublicContentToGameFormat = (apiContent, contentDetails = null, u
     contentId: apiContent.id,
     gameId: apiContent.media_type === 'video' ? 'video-game' : 'audio-game',
     user: {
+      id: apiContent.user_id,
       name: userData?.username || 'musiccreator',
       displayName: userData?.signup_username || userData?.username || 'Music Creator',
       avatar: userData?.profile_image_url || 'https://picsum.photos/50/50?random=user1',
     },
+    userId: apiContent.user_id,
     tempo: contentDetails?.tempo || apiContent.tempo,
     tags: contentDetails?.tags || apiContent.tags || [],
     created_at: apiContent.created_at

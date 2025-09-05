@@ -1,6 +1,8 @@
-import React from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { SafeAreaView, StyleSheet, View, Text, ActivityIndicator } from 'react-native';
 import MusicCreatorProfile from '../components/profile/MusicCreatorProfile';
+import userService from '../src/api/services/userService';
+import contentService from '../src/api/services/contentService';
 import { AppColors } from '../theme/Colors';
 
 const mockPlaylists = [
@@ -102,37 +104,124 @@ const mockUsers = {
 };
 
 export default function UserProfileScreen({ route, navigation }) {
-  const { username } = route.params || {};
-  
-  const user = mockUsers[username] || {
-    name: username,
-    avatar: 'https://i.pravatar.cc/150?img=4',
-    followers: 1250,
-    following: 89,
-    bio: 'Music enthusiast and content creator.',
-  };
+  const { userId, username } = route.params || {};
+  const [user, setUser] = useState(null);
+  const [userPosts, setUserPosts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        console.log('===== Fetching user profile data =====');
+        console.log('User ID:', userId);
+        console.log('Username:', username);
+        
+        // Fetch user data and user's content in parallel
+        const [userData, userContentData] = await Promise.all([
+          userService.getUserById(userId),
+          contentService.getUserContent(userId, 1, 20).catch(err => {
+            console.warn('Failed to fetch user content, using empty array:', err);
+            return { contents: [] };
+          })
+        ]);
+        
+        console.log('===== User Profile Data:', JSON.stringify(userData, null, 2), '=====');
+        console.log('===== User Content Data:', JSON.stringify(userContentData, null, 2), '=====');
+        
+        setUser(userData);
+        
+        // Transform user's content to posts format
+        if (userContentData.contents && userContentData.contents.length > 0) {
+          const posts = userContentData.contents.map(content => ({
+            id: content.id,
+            title: content.title,
+            description: content.description,
+            thumbnailUrl: content.media_type === 'video' 
+              ? `https://picsum.photos/300/300?random=${content.id}` 
+              : `https://picsum.photos/300/300?random=${content.id}`,
+            videoUrl: content.download_url,
+            mediaType: content.media_type,
+            createdAt: content.created_at
+          }));
+          setUserPosts(posts);
+        }
+      } catch (err) {
+        console.error('===== Error fetching user profile:', err, '=====');
+        setError('Failed to load user profile');
+        
+        // Fallback to mock data if API fails
+        const fallbackUser = mockUsers[username] || {
+          id: userId,
+          username: username,
+          signup_username: username,
+          profile_image_url: 'https://i.pravatar.cc/150?img=4',
+          total_subscribers: 1250,
+          bio: 'Music enthusiast and content creator.',
+          total_content_created: 0
+        };
+        setUser(fallbackUser);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (userId) {
+      fetchUserData();
+    } else {
+      setError('No user ID provided');
+      setIsLoading(false);
+    }
+  }, [userId, username]);
 
   const handleFollowToggle = () => {
-    console.log('Follow toggled for user:', username);
+    console.log('Follow toggled for user:', user?.username);
   };
 
   const handleMessage = () => {
-    console.log('Message user:', username);
+    console.log('Message user:', user?.username);
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: AppColors.background }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={AppColors.primary} />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error && !user) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: AppColors.background }]}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: AppColors.background }]}>
       <MusicCreatorProfile 
-        creatorName={user.name || 'Unknown User'}
-        avatar={user.avatar}
-        followers={user.followers || 0}
-        following={user.following || 0}
-        bio={user.bio || 'Music creator and content maker'}
+        creatorName={user?.signup_username || user?.username || 'Unknown User'}
+        avatar={user?.profile_image_url || 'https://i.pravatar.cc/150?img=4'}
+        followers={user?.total_subscribers || 0}
+        following={0} // Not available in API response
+        bio={user?.bio || 'Music creator and content maker'}
         featuredTracks={mockFeaturedTracks || []}
         playlists={mockPlaylists || []}
+        userPosts={userPosts || []}
         onFollowToggle={handleFollowToggle}
         onMessage={handleMessage}
         navigation={navigation}
+        totalContent={user?.total_content_created || 0}
+        yearsOfExperience={user?.years_of_experience || 0}
+        location={user?.location || ''}
+        isVerified={user?.is_verified || false}
+        subscriptionTier={user?.subscription_tier || 'free'}
       />
     </SafeAreaView>
   );
@@ -141,5 +230,26 @@ export default function UserProfileScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: AppColors.textSecondary,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  errorText: {
+    fontSize: 16,
+    color: AppColors.error || AppColors.textSecondary,
+    textAlign: 'center',
   },
 });
