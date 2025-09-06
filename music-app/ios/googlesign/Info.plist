@@ -53,6 +53,8 @@
 	<string>This app needs access to photo library to select profile images</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app needs access to microphone for music recording and voice features</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>This app needs access to speech recognition for voice commands</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

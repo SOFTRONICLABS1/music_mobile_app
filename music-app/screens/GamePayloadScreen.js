@@ -12,6 +12,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import contentService from '../src/api/services/contentService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import VoiceDetector from '../components/VoiceDetector';
 
 export default function GamePayloadScreen() {
   const { theme } = useTheme();
@@ -23,6 +24,7 @@ export default function GamePayloadScreen() {
   const [notes, setNotes] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [speechResults, setSpeechResults] = useState([]);
 
   useEffect(() => {
     const loadPayloadData = async () => {
@@ -68,6 +70,15 @@ export default function GamePayloadScreen() {
     }
   };
 
+  // Speech handler functions
+  const handleSpeechStart = () => {
+    console.log('Speech started');
+  };
+
+  const handleSpeechEnd = () => {
+    console.log('Speech ended');
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -103,6 +114,27 @@ export default function GamePayloadScreen() {
           <Text style={[styles.contentTitle, { color: theme.textSecondary }]}>
             Content: {contentTitle}
           </Text>
+        </View>
+
+        {/* Voice Detection */}
+        <View style={[styles.infoCard, { backgroundColor: theme.surface }]}>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>Voice Detection</Text>
+          <VoiceDetector 
+            onSpeechStart={handleSpeechStart}
+            onSpeechEnd={handleSpeechEnd}
+            onResults={(results) => setSpeechResults(results)}
+            theme={theme}
+          />
+          {speechResults.length > 0 && (
+            <View style={styles.speechResults}>
+              <Text style={[styles.speechLabel, { color: theme.primary }]}>Speech Results:</Text>
+              {speechResults.map((result, index) => (
+                <Text key={index} style={[styles.speechResult, { color: theme.text }]}>
+                  • {result}
+                </Text>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Payload Display */}
@@ -279,5 +311,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'monospace',
     lineHeight: 16,
+  },
+  speechResults: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+  },
+  speechLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  speechResult: {
+    fontSize: 14,
+    marginLeft: 8,
+    marginBottom: 4,
   },
 });
